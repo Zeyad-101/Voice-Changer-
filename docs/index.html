@@ -1,0 +1,2345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESP32 Voice Changer — Simulation & Wiring Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --mask:#10233F;      /* solder mask */
+  --mask-deep:#0B1A31; /* panels */
+  --mask-ink:#071226;  /* code / screens */
+  --silk:#F2F0E6;      /* silkscreen */
+  --silk-dim:#A6B4CA;
+  --gold:#D9A441;      /* ENIG pads */
+  --line:rgba(242,240,230,.14);
+  --mic:#7FD3E6; --amp:#F08A4B; --tft:#C4A7FF; --btn:#E9C46A;
+  --v3:#FF7A6B; --v5:#F5A25D; --gnd:#A6B4CA;
+  --display:"Saira Stencil One",Impact,sans-serif;
+  --body:"Instrument Sans",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--silk);font:16px/1.6 var(--body);
+  background-color:var(--mask);
+  background-image:radial-gradient(rgba(0,0,0,.28) 1.2px,transparent 1.6px);
+  background-size:22px 22px;}
+::selection{background:var(--gold);color:var(--mask-ink)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+code{font:500 .9em var(--mono);color:var(--gold)}
+.wrap{max-width:1200px;margin:0 auto;padding:0 28px}
+
+/* ---------- hero ---------- */
+.hero{padding-top:64px;padding-bottom:28px}
+.ref{font:500 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.hero h1{font:400 clamp(54px,9vw,120px)/.88 var(--display);letter-spacing:.01em;margin:14px 0 18px;color:var(--silk)}
+.hero h1 span{color:var(--gold)}
+.hero .bom{font:500 13px var(--mono);color:var(--silk-dim);display:flex;flex-wrap:wrap;gap:6px 18px;margin-bottom:18px}
+.hero .bom b{color:var(--silk);font-weight:600}
+.hero p{max-width:640px;margin:0;color:var(--silk-dim);font-size:17px}
+
+nav{position:sticky;top:0;z-index:30;background:rgba(11,26,49,.94);backdrop-filter:blur(6px);border-block:1px solid var(--line)}
+nav .wrap{display:flex;gap:4px;overflow-x:auto;padding-block:8px;padding-left:16px}
+nav a{font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--silk-dim);text-decoration:none;padding:7px 12px;border-radius:4px;white-space:nowrap}
+nav a:hover{color:var(--silk);background:rgba(242,240,230,.06)}
+
+section{padding:56px 0 8px}
+.head{display:flex;align-items:baseline;gap:16px;margin-bottom:6px}
+h2{font:700 30px/1.15 var(--body);letter-spacing:-.01em;margin:0}
+.lead{color:var(--silk-dim);max-width:720px;margin:0 0 24px}
+h3{font:600 18px var(--body);margin:0 0 8px}
+
+.panel{background:var(--mask-deep);border:1px solid var(--line);border-radius:6px;position:relative}
+/* gold corner "mounting holes" */
+.panel.holes::before,.panel.holes::after{content:"";position:absolute;width:9px;height:9px;border-radius:50%;border:2px solid var(--gold);top:10px;opacity:.7}
+.panel.holes::before{left:10px}.panel.holes::after{right:10px}
+
+/* ---------- simulator ---------- */
+.sim{display:grid;grid-template-columns:minmax(0,1fr) 330px;grid-template-areas:"board rack" "under rack";gap:18px;align-items:start}
+.sim>.panel{grid-area:board}.rack{grid-area:rack}.under{grid-area:under;display:grid;grid-template-columns:1fr 1fr;gap:18px}.under .panel{padding:14px}
+#spec{height:150px!important}#serial{height:150px}
+@media(max-width:1020px){.sim{grid-template-columns:1fr;grid-template-areas:"board" "rack" "under"}}
+@media(max-width:640px){.under{grid-template-columns:1fr}}
+.boardp{padding:14px 10px 10px}
+.boardp svg{width:100%;height:auto;display:block}
+@media(max-width:760px){.boardp{overflow-x:auto}.boardp svg{min-width:720px}}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font:500 12px var(--mono);color:var(--silk-dim)}
+.legend i{display:inline-block;width:16px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+#info{padding:14px 16px;border-top:1px solid var(--line);min-height:76px;font-size:14.5px;color:var(--silk-dim)}
+#info b{color:var(--silk)}
+#info .fix{display:block;margin-top:6px;color:var(--btn);font-size:13.5px}
+
+.rack{display:flex;flex-direction:column;gap:14px}
+.rack .panel{padding:14px}
+.lbl{display:flex;justify-content:space-between;font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--silk-dim);margin-bottom:10px}
+.lbl em{font-style:normal;color:var(--gold)}
+
+.btnrow{display:flex;gap:8px;flex-wrap:wrap}
+button{font:600 14px var(--body);color:var(--silk);background:transparent;border:1px solid var(--line);border-radius:4px;padding:9px 14px;cursor:pointer}
+button:hover{border-color:var(--silk-dim)}
+.power{background:var(--gold);color:var(--mask-ink);border-color:var(--gold);flex:1}
+.power:hover{background:#e6b65a;border-color:#e6b65a}
+.power.on{background:transparent;color:var(--gold)}
+.fileLbl{font:600 14px var(--body);border:1px dashed var(--silk-dim);border-radius:4px;padding:8px 12px;cursor:pointer;color:var(--silk-dim);flex:1;text-align:center}
+.fileLbl:hover{color:var(--silk);border-color:var(--silk)}
+.fileLbl input{position:absolute;opacity:0;width:1px;height:1px}
+
+.bezel{background:#04080f;border-radius:6px;padding:10px;border:1px solid #22324d;box-shadow:inset 0 0 0 1px #000}
+#tft{width:100%;aspect-ratio:160/128;image-rendering:pixelated;display:block;background:#000}
+
+.keys{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.key{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px 8px;border-radius:5px;border:1px solid var(--line);background:transparent;cursor:pointer;color:var(--silk)}
+.key .cap{width:36px;height:36px;border-radius:6px;background:#1b1f1d;border:1px solid #3a423e;display:grid;place-items:center;box-shadow:0 3px 0 #000;transition:transform .08s,box-shadow .08s}
+.key .cap::after{content:"";width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#3a3f3c,#0d0f0e)}
+.key.active{border-color:var(--btn)}
+.key.active .cap::after{background:radial-gradient(circle at 40% 35%,#f6dc8e,#a07a1c)}
+.key:active .cap{transform:translateY(2px);box-shadow:0 1px 0 #000}
+.key b{font:600 12px var(--mono)}
+.key small{font:500 10.5px var(--mono);letter-spacing:.06em;color:var(--silk-dim)}
+
+#spec{width:100%;height:110px;display:block;background:var(--mask-ink);border-radius:4px}
+#serial{height:150px;overflow:auto;background:var(--mask-ink);border-radius:4px;padding:10px;font:12px/1.5 var(--mono);color:#C9D6EA;white-space:pre-wrap;margin:0}
+.note{font-size:13.5px;color:var(--silk-dim);margin-top:14px}
+
+/* svg */
+.trace{fill:none;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;opacity:.8;transition:opacity .2s}
+.pulse{fill:none;stroke-width:3.2;stroke-linecap:round;stroke-dasharray:4 26;opacity:0;stroke:#fff}
+.running .pulse{opacity:.9;animation:run 1.1s linear infinite}
+@keyframes run{to{stroke-dashoffset:-30}}
+.dim{opacity:.1!important}
+.hot{opacity:1!important;stroke-width:4.5}
+.comp{cursor:pointer}
+.comp:hover .outline{stroke:var(--gold)}
+.pin{cursor:help}
+.pin:hover rect{fill:#fff}
+@media (prefers-reduced-motion:reduce){.running .pulse{animation:none;opacity:0}html{scroll-behavior:auto}}
+
+/* ---------- signal path ---------- */
+.path{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative}
+.path::before{content:"";position:absolute;left:12.5%;right:12.5%;top:21px;height:3px;background:linear-gradient(90deg,var(--mic),var(--gold) 50%,var(--amp))}
+.stop{padding:0 14px;position:relative}
+.stop .pad{width:44px;height:44px;margin:0 auto 16px;border-radius:50%;background:var(--mask);border:3px solid var(--gold);display:grid;place-items:center;font:600 14px var(--mono);color:var(--gold);position:relative}
+.stop h3{text-align:center;font-size:16px}
+.stop p{text-align:center;font-size:14px;color:var(--silk-dim);margin:0}
+@media(max-width:760px){.path{grid-template-columns:1fr 1fr;row-gap:28px}.path::before{display:none}}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:34px}
+@media(max-width:860px){.cols{grid-template-columns:1fr}}
+.cols .panel{padding:22px}
+.cols ul{padding-left:18px;margin:8px 0 0;color:var(--silk-dim)}
+.cols li{margin-bottom:6px}.cols li b{color:var(--silk)}
+.ratio{display:flex;gap:10px;margin:14px 0 4px;flex-wrap:wrap}
+.ratio div{flex:1;min-width:110px;border:1px solid var(--line);border-radius:4px;padding:10px 12px}
+.ratio strong{display:block;font:600 22px var(--mono);color:var(--gold)}
+.ratio span{font-size:13px;color:var(--silk-dim)}
+
+/* ---------- tabs ---------- */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:0;overflow-x:auto}
+.tab{border:none;border-bottom:2px solid transparent;border-radius:0;padding:12px 16px;font:500 13px var(--mono);letter-spacing:.06em;color:var(--silk-dim);white-space:nowrap}
+.tab:hover{color:var(--silk);border-color:transparent}
+.tab[aria-selected=true]{color:var(--silk);border-bottom-color:var(--gold)}
+.tab small{color:var(--gold);margin-right:8px;font-size:11px}
+.tabbody{padding:6px 22px 18px}
+
+.warn{border:1px solid rgba(255,122,107,.45);background:rgba(255,122,107,.07);border-radius:6px;padding:14px 18px;margin:0 0 20px;font-size:15px}
+.warn b{color:var(--v3)}
+.aside{font-size:14px;color:var(--silk-dim);margin-top:16px}
+
+table{width:100%;border-collapse:collapse;font-size:15px}
+th,td{text-align:left;padding:13px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+th{font:500 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--silk-dim)}
+td.p{font:600 14px var(--mono);white-space:nowrap;width:90px}
+td.t{font:600 14px var(--mono);white-space:nowrap;width:90px;color:var(--gold)}
+td .fix{display:block;margin-top:6px;font-size:13.5px;color:var(--btn)}
+td .fix::before{content:"Correction  ";font:600 10.5px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:8px}
+
+/* buttons section */
+.btngrid{display:grid;grid-template-columns:360px 1fr;gap:18px}
+@media(max-width:860px){.btngrid{grid-template-columns:1fr}}
+.btngrid .panel{padding:22px}
+ol.how{margin:0;padding-left:20px;color:var(--silk-dim)}
+ol.how li{margin-bottom:8px}ol.how b{color:var(--silk)}
+
+/* code */
+.setup{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+@media(max-width:900px){.setup{grid-template-columns:1fr 1fr}}
+.setup div{border-top:2px solid var(--gold);padding-top:10px;font-size:14px;color:var(--silk-dim)}
+.setup b{display:block;color:var(--silk);margin-bottom:2px}
+.codebar{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 22px;border-bottom:1px solid var(--line)}
+.codebar p{margin:0;font-size:14px;color:var(--silk-dim);max-width:720px}
+.codebar p b{color:var(--silk)}
+pre.code{margin:0;padding:18px 22px;background:var(--mask-ink);overflow:auto;max-height:520px;font:13px/1.6 var(--mono);color:#DCE3EE;border-radius:0 0 6px 6px}
+.c-com{color:#7186A6}.c-kw{color:#E9C46A}.c-pp{color:#F08A4B}.c-num{color:#7FD3E6}.c-str{color:#C9D6EA}
+
+footer{padding-top:60px;padding-bottom:40px;font:500 12px var(--mono);letter-spacing:.08em;color:var(--silk-dim);text-transform:uppercase}
+
+/* ---- realistic sim ---- */
+.w-out{fill:none;stroke:#050913;stroke-width:6.5;stroke-linecap:round;stroke-linejoin:round}
+.w-main{fill:none;stroke-width:3.6;stroke-linecap:round;stroke-linejoin:round;transition:stroke-width .15s}
+.w-pulse{fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-dasharray:3 22;opacity:0}
+.w-hit{fill:none;stroke:transparent;stroke-width:12;pointer-events:stroke;cursor:help}
+.wire.live .w-pulse{opacity:.85;animation:run 1s linear infinite}
+.wire[data-group] .w-pulse{animation-delay:calc(var(--d,0) * 1s)}
+@keyframes run{to{stroke-dashoffset:-25}}
+.wire.hover .w-main,.wire.sel .w-main{stroke-width:5}
+.wire.flash .w-main{stroke:#fff}
+.wire,.mod{transition:opacity .2s}
+.focus .wire{opacity:.14}.focus .wire.sel{opacity:1}
+.focus .mod{opacity:.4}.focus .mod.sel,.focus .mod[data-group=esp]{opacity:1}
+.mod{cursor:pointer}
+.pin{cursor:help}
+@media (prefers-reduced-motion:reduce){.wire.live .w-pulse{animation:none;opacity:.5}}
+.ghost{padding:6px 12px;font-size:13px}
+.power{width:100%}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button,.seg .segfile{border:none;border-radius:0;padding:9px 6px;font:600 13px var(--body);color:var(--silk-dim);text-align:center;cursor:pointer;background:transparent}
+.seg>*+*{border-left:1px solid var(--line)!important}
+.seg button[aria-pressed=true],.seg .segfile.on{background:var(--gold);color:var(--mask-ink)}
+.seg button:hover,.seg .segfile:hover{color:var(--silk)}
+.seg button[aria-pressed=true]:hover,.seg .segfile.on:hover{color:var(--mask-ink)}
+.segfile input{position:absolute;opacity:0;width:1px;height:1px}
+.vol{display:flex;align-items:center;gap:12px;margin-top:14px;font:500 12px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--silk-dim)}
+.vol input{flex:1;accent-color:var(--gold)}
+.ok{color:#8BE3A6;font-weight:600}.bad{color:var(--v3);font-weight:600}.add{color:var(--gold);font-weight:600}
+</style>
+</head>
+<body>
+
+<header class="wrap hero">
+  <div class="ref">Rev B · final wiring</div>
+  <h1>Voice <span>Changer</span></h1>
+  <div class="bom"><span><b>U1</b> ESP32 DevKit</span><span><b>MK1</b> INMP441 mic</span><span><b>U2</b> MAX98357A amp</span><span><b>LCD1</b> SPI TFT (ST7789 / ST7735)</span><span><b>SW1–4</b> push buttons</span></div>
+  <p>Hold the blue button and speak into the mic. It records only while you hold it. Let go, then press grey, white or black, and the ESP32 plays your recording back with a new frequency: chipmunk, monster or robot. Try it below before you build it.</p>
+</header>
+
+<nav><div class="wrap">
+  <a href="#simulation">Simulation</a>
+  <a href="#signal">Signal path</a>
+  <a href="#pins">Pins</a>
+  <a href="#buttons">Buttons</a>
+  <a href="#tests">Code</a>
+</div></nav>
+
+<main class="wrap">
+
+<!-- SIMULATION -->
+<section id="simulation">
+  <div class="sim">
+    <div class="panel holes boardpanel">
+      <div class="boardp"><svg id="wiring" viewBox="0 0 1100 720" role="img" aria-label="Interactive wiring diagram of the voice changer"></svg></div>
+      <div class="bar">
+        <div class="legend">
+          <span><i style="background:var(--mic)"></i>Mic I2S</span>
+          <span><i style="background:var(--amp)"></i>Amp I2S</span>
+          <span><i style="background:var(--tft)"></i>Screen SPI</span>
+          <span><i style="background:var(--btn)"></i>Buttons</span>
+          <span><i style="background:var(--v3)"></i>3V3</span>
+          <span><i style="background:var(--v5)"></i>5V</span>
+          <span><i style="background:#8391A8"></i>GND</span>
+        </div>
+        <button id="resetView" class="ghost">Show all wires</button>
+      </div>
+      <div id="info">Click a module to highlight its wires. Hover any pin or wire to see what it does. Hold SW1 (blue) to record, then press SW2–SW4 to play it back.</div>
+    </div>
+
+    <div class="rack">
+      <div class="panel">
+        <button id="power" class="power">Power on</button>
+        <div class="lbl" style="margin-top:16px"><span>Mic input</span></div>
+        <div class="seg" id="srcSeg">
+          <button data-src="demo" aria-pressed="true">Demo voice</button>
+          <button data-src="mic" aria-pressed="false">My mic</button>
+          <label class="segfile" tabindex="0">Audio file<input type="file" id="file" accept="audio/*"></label>
+        </div>
+        <div class="vol"><label for="vol">Volume</label><input type="range" id="vol" min="0" max="1" step="0.01" value="0.6"></div>
+        <p class="note" id="srcNote">Wear headphones when you use your mic, or the speaker will feed back into it and howl.</p>
+      </div>
+      <div class="panel">
+        <div class="lbl"><span>LCD1 · close-up</span><em>160 × 128</em></div>
+        <div class="bezel"><canvas id="tft" width="160" height="128"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="lbl"><span>SW1–SW4 · Buttons</span><em>hold SW1 to record</em></div>
+        <div class="keys" id="keys"></div>
+      </div>
+    </div>
+
+    <div class="under">
+      <div class="panel">
+        <div class="lbl"><span>Spectrum</span><span><em style="color:var(--mic)">in</em> / <em style="color:var(--amp)">out</em></span></div>
+        <canvas id="spec" width="600" height="220"></canvas>
+      </div>
+      <div class="panel">
+        <div class="lbl"><span>Serial monitor</span><em>115200</em></div>
+        <pre id="serial"></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SIGNAL PATH -->
+<section id="signal">
+  <div class="head"><h2>Signal path</h2></div>
+  <p class="lead">Recording and playback are two separate steps. While you hold BLUE, the mic fills a buffer in RAM. When you press an effect button, the ESP32 reads that buffer, shifts the frequency and sends it to the amp in blocks of 256 samples (16 ms).</p>
+  <div class="path">
+    <div class="stop"><div class="pad">1</div><h3 style="color:var(--mic)">Mic records</h3><p>While BLUE (D27) is held, the INMP441 sends 16,000 samples per second over I2S.</p></div>
+    <div class="stop"><div class="pad">2</div><h3>ESP32 stores</h3><p>I2S port 0 reads pin D34 into a RAM buffer of about 3 s. Let go of BLUE and it stops.</p></div>
+    <div class="stop"><div class="pad">3</div><h3>ESP32 shifts the frequency</h3><p>GREY ×1.6, WHITE ×0.65 or BLACK robot, applied to the saved recording.</p></div>
+    <div class="stop"><div class="pad">4</div><h3 style="color:var(--amp)">Amp plays</h3><p>I2S port 1 sends the new samples on D19. D5 wakes the amp only while it plays.</p></div>
+  </div>
+
+  <div class="cols">
+    <div class="panel">
+      <h3>What “changing the frequency” means</h3>
+      <p style="color:var(--silk-dim);margin:0">Most men speak at about 85–180 Hz and most women at 165–255 Hz. Multiply every frequency in the voice by one number and the voice changes character.</p>
+      <div class="ratio">
+        <div><strong>×1.6</strong><span>chipmunk, higher</span></div>
+        <div><strong>×0.65</strong><span>monster, deeper</span></div>
+        <div><strong>×sin 50Hz</strong><span>robot, ring modulation</span></div>
+      </div>
+      <p class="aside">In the simulation, hold SW1 to record, then press SW2 and watch the orange peaks in the spectrum sit to the right of where the blue ones were. SW3 moves them left.</p>
+    </div>
+    <div class="panel">
+      <h3>Why these pins work together</h3>
+      <ul>
+        <li><b>Two I2S ports.</b> The mic (in) and the amp (out) each get their own port, so both run at the same time.</li>
+        <li><b>D34 is input-only.</b> Mic data only ever comes in, so this pin is a perfect fit.</li>
+        <li><b>D17 and D16 carry the screen SPI.</b> The ESP32 can route its hardware SPI to almost any pin, so the code calls <code>SPI.begin(17, -1, 16, 15)</code> and the screen still draws at full speed.</li>
+        <li><b>Buttons on 27, 26, 22 and 23</b> use the ESP32's built-in pull-ups, so you don't need resistors.</li>
+        <li><b>D2, D5 and D15 are boot pins.</b> They are safe here because the screen and amp only listen on them. If an upload fails, unplug the screen DC wire (D2) and try again.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- PINS -->
+<section id="pins">
+  <div class="head"><h2>Every pin, explained</h2></div>
+  <p class="lead">These are your notes in plain English. Where a note was slightly off, there's a yellow correction under it.</p>
+  <div class="warn"><b>Add the power wires.</b> Mic VDD → 3V3 (never 5V). Amp VIN → VIN (5V). Screen VCC → VIN (5V), which is fine because the red 1.8" board has its own 3.3 V regulator (if its J1 jumper is shorted, use 3V3). Screen BL → 3V3. Every GND → ESP32 GND.</div>
+  <div class="panel">
+    <div class="tabs" role="tablist" id="pinTabs"></div>
+    <div class="tabbody" id="pinBody"></div>
+  </div>
+  <p class="aside">These tables match your final connection list. The firmware and every test sketch below use the same pins.</p>
+</section>
+
+<!-- BUTTONS -->
+<section id="buttons">
+  <div class="head"><h2>Wiring 4-leg buttons</h2></div>
+  <p class="lead">A 4-leg tactile button is really a 2-contact switch. Its legs come in pairs that are always connected inside, and pressing the button joins the two pairs.</p>
+  <div class="btngrid">
+    <div class="panel">
+      <svg viewBox="0 0 320 230" style="width:100%;display:block" role="img" aria-label="Button legs diagram">
+        <rect x="95" y="55" width="130" height="120" rx="6" fill="none" stroke="#F2F0E6" stroke-width="1.5"/>
+        <circle cx="160" cy="115" r="34" fill="#1b1f1d" stroke="#3a423e" stroke-width="2"/>
+        <g font-family="IBM Plex Mono, monospace" font-size="12" fill="#A6B4CA">
+          <rect x="83" y="63" width="14" height="14" fill="#D9A441"/><text x="18" y="74">leg A</text>
+          <rect x="223" y="63" width="14" height="14" fill="#D9A441"/><text x="246" y="74">leg A'</text>
+          <rect x="83" y="153" width="14" height="14" fill="#A6B4CA"/><text x="18" y="164">leg B</text>
+          <rect x="223" y="153" width="14" height="14" fill="#A6B4CA"/><text x="246" y="164">leg B'</text>
+        </g>
+        <line x1="97" y1="70" x2="223" y2="70" stroke="#D9A441" stroke-dasharray="3 5"/>
+        <line x1="97" y1="160" x2="223" y2="160" stroke="#A6B4CA" stroke-dasharray="3 5"/>
+        <line x1="90" y1="70" x2="230" y2="160" stroke="#E9C46A" stroke-width="3"/>
+        <text x="160" y="32" text-anchor="middle" font-family="Instrument Sans, sans-serif" font-size="13" fill="#A6B4CA">dashed: always connected inside</text>
+        <text x="160" y="208" text-anchor="middle" font-family="Instrument Sans, sans-serif" font-size="13" fill="#E9C46A">use the two diagonal legs</text>
+      </svg>
+    </div>
+    <div class="panel">
+      <ol class="how">
+        <li>Place the button across the middle gap of the breadboard.</li>
+        <li>Wire <b>one diagonal leg to GND</b> and the <b>opposite diagonal leg to the ESP32 pin</b>. Diagonal legs are always on different pairs, so this can't go wrong.</li>
+        <li>In code use <code>pinMode(pin, INPUT_PULLUP)</code>. The pin reads <b>HIGH when released</b> and <b>LOW when pressed</b>. You don't need a resistor.</li>
+      </ol>
+      <table style="margin-top:12px">
+        <tr><th>Button</th><th>Pin</th><th>Job</th></tr>
+        <tr><td class="p">SW1 Blue</td><td class="t">D27</td><td>Hold = record. Let go = stop</td></tr>
+        <tr><td class="p">SW2 Grey</td><td class="t">D26</td><td>Play as chipmunk ×1.6</td></tr>
+        <tr><td class="p">SW3 White</td><td class="t">D22</td><td>Play as monster ×0.65</td></tr>
+        <tr><td class="p">SW4 Black</td><td class="t">D23</td><td>Play as robot (ring modulation 50 Hz)</td></tr>
+      </table>
+      <p class="aside">All four are free, safe pins with built-in pull-ups. Avoid D0 and D12 for buttons, because they affect booting.</p>
+    </div>
+  </div>
+</section>
+
+<!-- TESTS -->
+<section id="tests">
+  <div class="head"><h2>Code</h2></div>
+  <p class="lead">The first tab is the final firmware. Before you upload it, test each part on its own with the other tabs. If the final build misbehaves, you'll already know which parts work. Each test prints PASS or FAIL hints to the Serial Monitor.</p>
+  <div class="setup">
+    <div><b>Board package</b>Boards Manager → “esp32 by Espressif Systems” 3.x (includes ESP_I2S)</div>
+    <div><b>Screen library</b>Library Manager → “Adafruit ST7735 and ST7789 Library”</div>
+    <div><b>Board setting</b>ESP32 Dev Module, your COM port, upload speed 921600</div>
+    <div><b>Stuck on “Connecting…”</b>Hold the BOOT button on the ESP32 until the upload starts</div>
+  </div>
+  <div class="panel">
+    <div class="tabs" role="tablist" id="codeTabs"></div>
+    <div class="codebar"><p id="codeNote"></p><button id="copy">Copy code</button></div>
+    <pre class="code" id="code"></pre>
+  </div>
+</section>
+</main>
+
+<footer class="wrap">ESP32 voice changer · final wiring · final firmware is in the Code section</footer>
+
+<template id="src-final">/*
+  ============================================================
+   ESP32 VOICE CHANGER — FINAL FIRMWARE  (rev 4)
+  ============================================================
+  Hardware : ESP32 DevKit V1, INMP441 I2S mic, MAX98357A I2S amp + speaker,
+             SPI TFT (ST7789 or ST7735, picked on the screen itself), 4 buttons
+
+  How it works:
+    BLUE  (D27) : HOLD to record. It records ONLY while you hold it.
+                  Let go = recording stops. It also stops when RAM is full.
+    GREY  (D26) : play the recording with HIGH pitch  (chipmunk x1.6)
+    WHITE (D22) : play the recording with LOW pitch   (monster  x0.65)
+    BLACK (D23) : play the recording as ROBOT         (ring modulation 50 Hz)
+    Press another effect button while it plays -&gt; restarts with that effect.
+    Press BLUE while it plays -&gt; playback stops and a new recording starts.
+
+  The mic is used ONLY while BLUE is held. The rest of the time its data is ignored.
+  The screen shows: state, a "tape" of the recording (bars), time and frequency.
+
+  FIRST START = SCREEN SETUP (because screens with the same pins differ):
+    GREY  : try the next screen type
+    WHITE : rotate
+    BLUE  : save and start
+    Pick the one where the white frame touches all 4 edges of the glass.
+    To open this setup again later: hold GREY while you power on.
+
+  SPEAKER TEST: hold WHITE while you power on. You must hear a clean 440 Hz tone.
+    Clean tone  -&gt; amp, speaker and power are good.
+    Dirty tone  -&gt; power or speaker wiring problem (see OUT_VOLUME below).
+
+  Wiring:
+    TFT  SCL-&gt;D17  SDA-&gt;D16  CS-&gt;D15  DC(DS)-&gt;D2  RST-&gt;D4  BL-&gt;3V3  VCC-&gt;VIN  GND-&gt;GND
+    AMP  LRC-&gt;D21  BCLK-&gt;D18  DIN-&gt;D19  SD-&gt;D5  VIN-&gt;VIN(5V)  GND-&gt;GND  speaker on + / -
+    MIC  SD-&gt;D34   WS-&gt;D33    SCK-&gt;D32  L/R-&gt;GND  VDD-&gt;3V3 (NOT 5V)  GND-&gt;GND
+    BTN  one diagonal leg to the pin, the other diagonal leg to GND
+         Blue D27, Grey D26, White D22, Black D23
+
+  Arduino IDE:
+    Board package : "esp32 by Espressif Systems" 3.x
+    Libraries     : "Adafruit ST7735 and ST7789 Library" + "Adafruit GFX Library"
+    Board         : ESP32 Dev Module
+*/
+
+#include &lt;Arduino.h&gt;
+#include &lt;SPI.h&gt;
+#include &lt;Preferences.h&gt;
+#include &lt;Adafruit_GFX.h&gt;
+#include &lt;Adafruit_ST7735.h&gt;
+#include &lt;Adafruit_ST7789.h&gt;
+#include &lt;driver/i2s_std.h&gt;
+#include &lt;esp_heap_caps.h&gt;
+#include &lt;math.h&gt;
+
+// ======================= SETTINGS =======================
+#define FORCE_PROFILE   -1        // -1 = choose on screen. 0..6 = force a line of PROFILES[] below
+#define FORCE_ROTATION  0         // used only with FORCE_PROFILE (0..3)
+
+#define SAMPLE_RATE     16000
+#define MAX_SECONDS     8         // upper limit. Real limit = free RAM (about 3 s without PSRAM)
+
+#define PITCH_HIGH      1.6f      // GREY
+#define PITCH_LOW       0.65f     // WHITE
+#define ROBOT_HZ        50.0f     // BLACK
+#define OUT_VOLUME      0.40f     // 0.0 ... 1.0. Too high = the amp clips and USB power sags = dirty sound
+#define NOISE_GATE      1         // 1 = make the quiet gaps between words quieter (less hiss)
+#define TONE_CUT_HZ     3800.0f   // playback treble cut (less hiss). 7000 = almost off
+#define TFT_SPI_HZ      27000000
+// ========================================================
+
+// ---------- Pins ----------
+#define PIN_TFT_SCK   17
+#define PIN_TFT_MOSI  16
+#define PIN_TFT_CS    15
+#define PIN_TFT_DC    2
+#define PIN_TFT_RST   4
+
+#define PIN_AMP_LRC   21
+#define PIN_AMP_BCLK  18
+#define PIN_AMP_DIN   19
+#define PIN_AMP_SD    5
+
+#define PIN_MIC_SD    34
+#define PIN_MIC_WS    33
+#define PIN_MIC_SCK   32
+
+#define PIN_BTN_REC   27   // Blue
+#define PIN_BTN_HIGH  26   // Grey
+#define PIN_BTN_LOW   22   // White
+#define PIN_BTN_ROBOT 23   // Black
+
+#define CHUNK     256      // samples per block (16 ms)
+#define DMA_BUFS  8        // 8 x 16 ms = 128 ms of I2S buffering
+#define HIST      512      // samples kept for the frequency measurement
+
+#ifndef I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG
+#define I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG I2S_STD_PHILIP_SLOT_DEFAULT_CONFIG
+#endif
+
+// ======================= TYPES =======================
+struct Profile {
+  const char *name;
+  uint8_t  driver;     // 89 = ST7789, 35 = ST7735
+  uint16_t w, h;       // native size (ST7789)
+  uint8_t  tab;        // ST7735 tab type
+};
+
+struct Button {
+  uint8_t pin;
+  bool stable;         // true = pressed (after debounce)
+  bool raw;
+  uint32_t t;
+};
+
+struct PitchShifter {
+  float ratio, d, win;
+};
+
+enum Effect { FX_HIGH = 0, FX_LOW, FX_ROBOT };
+enum Action { ACT_NONE, ACT_RECORD, ACT_HIGH, ACT_LOW, ACT_ROBOT };
+
+// ======================= GLOBALS =======================
+const Profile PROFILES[] = {
+  { "ST7789 240x320", 89, 240, 320, 0 },               // 0  (2.0" / 2.4" / 2.8")
+  { "ST7789 240x240", 89, 240, 240, 0 },               // 1  (1.3" / 1.54")
+  { "ST7789 240x280", 89, 240, 280, 0 },               // 2  (1.69")
+  { "ST7789 170x320", 89, 170, 320, 0 },               // 3  (1.9")
+  { "ST7789 135x240", 89, 135, 240, 0 },               // 4  (1.14")
+  { "ST7735 128x160 A", 35, 128, 160, INITR_BLACKTAB },// 5  (1.8")
+  { "ST7735 128x160 B", 35, 128, 160, INITR_GREENTAB },// 6  (1.8", other batch)
+};
+const uint8_t NUM_PROFILES = sizeof(PROFILES) / sizeof(PROFILES[0]);
+
+Adafruit_ST77xx *tft = nullptr;
+Preferences prefs;
+
+i2s_chan_handle_t rxChan = NULL;   // mic  = I2S port 0
+i2s_chan_handle_t txChan = NULL;   // amp  = I2S port 1
+
+int16_t *recBuf = nullptr;
+uint32_t recMax = 0;               // capacity (samples)
+uint32_t recLen = 0;               // length of last recording (samples)
+
+int32_t micRaw[CHUNK * 2];         // stereo frames from the mic (L,R)
+int16_t micBlock[CHUNK];           // cleaned mono block
+int16_t outBlock[CHUNK];           // mono copy of what is played (for the screen)
+int16_t outFrame[CHUNK * 2];       // stereo L,R to the amp
+int16_t hist[HIST];                // last 512 samples (frequency measurement)
+float   acBuf[HIST / 2];
+
+bool  micRight = false;            // which I2S slot the mic really talks on (auto-detected)
+bool  micLock  = true;             // slot is chosen once at start-up
+float micEL = 0, micER = 0;        // activity of each slot
+float dcX = 0, dcY = 0;            // DC blocker state
+
+const char *fxName[] = { "CHIPMUNK", "MONSTER", "ROBOT" };
+const char *fxHint[] = { "Pitch up x1.6", "Pitch down x0.65", "Ring mod 50 Hz" };
+const uint16_t fxCol[] = { 0xEE2D, 0xF449, 0x7E9C };   // warm yellow, orange, cyan
+
+Button bRec   = { PIN_BTN_REC,   false, false, 0 };
+Button bHigh  = { PIN_BTN_HIGH,  false, false, 0 };
+Button bLow   = { PIN_BTN_LOW,   false, false, 0 };
+Button bRobot = { PIN_BTN_ROBOT, false, false, 0 };
+
+// ---------- colours (RGB565) — same family as the project page ----------
+#define C_BG       0x08C6   // deep navy
+#define C_PANEL    0x1107   // panel navy
+#define C_LINE     0x2A2D   // quiet lines
+#define C_UPCOMING 0x4B72   // tape bars not played yet
+#define C_SILK     0xF79C   // off-white text
+#define C_DIM      0xA5B9   // secondary text
+#define C_GOLD     0xDD28
+#define C_READY    0x9F16   // mint
+#define C_REC      0xFBCD   // coral red
+#define C_WARN     0xF449   // orange
+
+// ---------- screen layout (computed from the real screen size) ----------
+int scrW, scrH, ts;                // ts = text scale (1 small screens, 2 big screens)
+int topH, yBig, yHint, yTape, tapeH, yField, fieldH, fieldW, yChips, chipH, slotW;
+int nBars, barPitch, barW, tapeX0, tapeMid, tapeHalf;
+uint8_t env[100];                  // bar heights of the saved recording
+char fieldTxt[2][16] = { "", "" };
+bool micOk = true;
+
+// ======================= BUTTONS =======================
+// Returns true once, at the moment the button becomes pressed.
+bool updateButton(Button &amp;b) {
+  bool r = (digitalRead(b.pin) == LOW);
+  uint32_t now = millis();
+  if (r != b.raw) { b.raw = r; b.t = now; }
+  if ((now - b.t) &gt; 25 &amp;&amp; r != b.stable) {
+    b.stable = r;
+    return r;
+  }
+  return false;
+}
+
+Action pollButtons() {
+  bool r = updateButton(bRec);
+  bool h = updateButton(bHigh);
+  bool l = updateButton(bLow);
+  bool o = updateButton(bRobot);
+  if (r) { Serial.println("BTN BLUE  (D27) pressed"); return ACT_RECORD; }
+  if (h) { Serial.println("BTN GREY  (D26) pressed"); return ACT_HIGH; }
+  if (l) { Serial.println("BTN WHITE (D22) pressed"); return ACT_LOW; }
+  if (o) { Serial.println("BTN BLACK (D23) pressed"); return ACT_ROBOT; }
+  return ACT_NONE;
+}
+
+// ======================= SCREEN =======================
+void startDisplay(uint8_t p, uint8_t rot) {
+  const Profile &amp;pr = PROFILES[p];
+  if (pr.driver == 89) {
+    Adafruit_ST7789 *d = new Adafruit_ST7789(&amp;SPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
+    d-&gt;init(pr.w, pr.h);
+    tft = d;
+  } else {
+    Adafruit_ST7735 *d = new Adafruit_ST7735(&amp;SPI, PIN_TFT_CS, PIN_TFT_DC, PIN_TFT_RST);
+    d-&gt;initR(pr.tab);
+    tft = d;
+  }
+  tft-&gt;setSPISpeed(TFT_SPI_HZ);
+  tft-&gt;setRotation(rot);
+  tft-&gt;setTextWrap(false);
+  tft-&gt;fillScreen(ST77XX_BLACK);
+  Serial.printf("Screen: %s, rotation %d, %d x %d\n", pr.name, rot, tft-&gt;width(), tft-&gt;height());
+}
+
+void textAt(int x, int y, uint8_t size, uint16_t col, const char *s) {
+  tft-&gt;setTextSize(size);
+  tft-&gt;setTextColor(col);
+  tft-&gt;setCursor(x, y);
+  tft-&gt;print(s);
+}
+
+void computeLayout() {
+  scrW = tft-&gt;width();
+  scrH = tft-&gt;height();
+  ts = (scrW &gt;= 200 &amp;&amp; scrH &gt;= 200) ? 2 : 1;
+  topH   = 8 * ts + 4;
+  yBig   = topH + 6;
+  yHint  = yBig + 16 * ts + 3;
+  yTape  = yHint + 8 * ts + 5;
+  chipH  = 8 * ts + 6;
+  yChips = scrH - chipH - 3;
+  fieldH = 8 * ts + 6;
+  yField = yChips - fieldH - 5;
+  tapeH  = yField - 5 - yTape;
+  fieldW = (scrW - 12) / 2;
+  slotW  = (scrW - 8) / 4;
+  barW     = ts + 1;
+  barPitch = barW + 1;
+  nBars = (scrW - 16) / barPitch;
+  if (nBars &gt; 100) nBars = 100;
+  tapeX0   = 4 + (scrW - 8 - (nBars * barPitch - 1)) / 2;
+  tapeMid  = yTape + tapeH / 2;
+  tapeHalf = tapeH / 2 - 4;
+  if (tapeHalf &lt; 2) tapeHalf = 2;
+}
+
+// ---------- the four buttons, drawn like the real ones ----------
+void drawChips() {
+  const char *lab[4]    = { "REC", "HI", "LO", "BOT" };
+  const uint16_t fill[4] = { 0x2B7F, 0x8C71, 0xFFFF, 0x0000 };
+  const uint16_t ink[4]  = { 0xFFFF, 0x0000, 0x0000, 0xFFFF };
+  for (int i = 0; i &lt; 4; i++) {
+    int x = 4 + i * slotW + 2, w = slotW - 6;
+    tft-&gt;fillRoundRect(x, yChips, w, chipH, chipH / 3, fill[i]);
+    if (i == 3) tft-&gt;drawRoundRect(x, yChips, w, chipH, chipH / 3, C_DIM);
+    int tw = strlen(lab[i]) * 6 * ts;
+    textAt(x + (w - tw) / 2 + ts / 2, yChips + 3, ts, ink[i], lab[i]);
+  }
+}
+
+// ring around the button that is in use (-1 = none)
+void chipRing(int active, uint16_t col) {
+  for (int i = 0; i &lt; 4; i++) {
+    int x = 4 + i * slotW;
+    tft-&gt;drawRoundRect(x, yChips - 2, slotW - 2, chipH + 4, chipH / 3 + 2, i == active ? col : C_BG);
+  }
+}
+
+void setField(int i, const char *s, uint16_t col) {
+  if (strcmp(s, fieldTxt[i]) == 0) return;       // redraw only when the text changes
+  strncpy(fieldTxt[i], s, sizeof(fieldTxt[i]) - 1);
+  fieldTxt[i][sizeof(fieldTxt[i]) - 1] = 0;
+  int x = 4 + i * (fieldW + 4);
+  tft-&gt;fillRect(x + 3, yField + 2, fieldW - 6, fieldH - 4, C_PANEL);
+  textAt(x + 5, yField + 3, ts, col, s);
+}
+
+void setHint(const char *s, uint16_t col) {
+  tft-&gt;fillRect(0, yHint, scrW, 8 * ts, C_BG);
+  textAt(4, yHint, ts, col, s);
+}
+
+// state mark at the right of the big word: 1 = ring, 2 = dot, 3 = play triangle
+void drawGlyph(int type, uint16_t col, int textW) {
+  int g = 14 * ts, gx = scrW - 4 - g, gy = yBig + ts;
+  if (4 + textW + 6 &gt; gx) return;                // no room next to a long word
+  tft-&gt;fillRect(gx, gy, g, g, C_BG);
+  int cx = gx + g / 2, cy = gy + g / 2;
+  if (type == 1) { tft-&gt;drawCircle(cx, cy, 6 * ts, col); tft-&gt;drawCircle(cx, cy, 6 * ts - 1, col); tft-&gt;fillCircle(cx, cy, 2 * ts, col); }
+  if (type == 2) tft-&gt;fillCircle(cx, cy, 6 * ts, col);
+  if (type == 3) tft-&gt;fillTriangle(gx + 2 * ts, gy + ts, gx + 2 * ts, gy + 13 * ts, gx + 13 * ts, cy, col);
+}
+
+void setState(const char *big, uint16_t col, const char *hint, int glyph, int activeChip) {
+  tft-&gt;fillRect(0, topH, scrW, 2, col);                    // accent line under the title
+  tft-&gt;fillRect(0, yBig, scrW, 16 * ts, C_BG);
+  textAt(4, yBig, 2 * ts, col, big);
+  drawGlyph(glyph, col, strlen(big) * 12 * ts);
+  setHint(hint, C_SILK);
+  chipRing(activeChip, col);
+  Serial.printf("[%s] %s\n", big, hint);
+}
+
+// ---------- the tape: one bar per slice of sound ----------
+int barHeight(int peak, float ref) {
+  float v = peak / ref;
+  if (v &gt; 1) v = 1;
+  int h = (int)(sqrtf(v) * tapeHalf);
+  return h &lt; 1 ? 1 : h;
+}
+
+void tapeBar(int i, int h, uint16_t col, bool erase) {
+  int x = tapeX0 + i * barPitch;
+  if (erase) tft-&gt;fillRect(x, tapeMid - tapeHalf, barW, 2 * tapeHalf, C_PANEL);
+  tft-&gt;fillRect(x, tapeMid - h, barW, 2 * h, col);
+}
+
+void tapeClear() {
+  tft-&gt;fillRoundRect(4, yTape, scrW - 8, tapeH, 3 * ts, C_PANEL);
+  for (int i = 0; i &lt; nBars; i++) tapeBar(i, 1, C_LINE, false);   // empty slots
+}
+
+// measure the saved recording once: one bar height per slice
+void buildOverview() {
+  for (int i = 0; i &lt; nBars; i++) {
+    uint32_t a = (uint32_t)((uint64_t)i * recLen / nBars);
+    uint32_t b = (uint32_t)((uint64_t)(i + 1) * recLen / nBars);
+    int pk = 0;
+    for (uint32_t k = a; k &lt; b; k++) {
+      int v = abs((int)recBuf[k]);
+      if (v &gt; pk) pk = v;
+    }
+    env[i] = (uint8_t)barHeight(pk, 30000.0f);
+  }
+}
+
+void drawOverview(uint16_t col) {
+  for (int i = 0; i &lt; nBars; i++) tapeBar(i, env[i], col, true);
+}
+
+void drawFrame() {
+  tft-&gt;fillScreen(C_BG);
+  textAt(4, 2, ts, C_DIM, "VOICE CHANGER");
+  for (int i = 0; i &lt; 2; i++) {
+    tft-&gt;fillRoundRect(4 + i * (fieldW + 4), yField, fieldW, fieldH, 2 * ts, C_PANEL);
+    fieldTxt[i][0] = 0;
+  }
+  tapeClear();
+  drawChips();
+}
+
+void showReady() {
+  char s[16];
+  if (!micOk)      setState("READY", C_READY, "No mic signal!", 1, -1);
+  else if (recLen) setState("READY", C_READY, "Press GREY/WHT/BLK", 1, -1);
+  else             setState("READY", C_READY, "Hold BLUE to record", 1, -1);
+  if (recLen) {
+    drawOverview(C_SILK);
+    snprintf(s, sizeof(s), "LAST %.1fs", recLen / (float)SAMPLE_RATE);
+  } else {
+    tapeClear();
+    snprintf(s, sizeof(s), "LAST --");
+  }
+  setField(0, s, C_SILK);
+  snprintf(s, sizeof(s), "MAX %.1fs", recMax / (float)SAMPLE_RATE);
+  setField(1, s, C_DIM);
+}
+
+void fatal(const char *big, const char *small) {
+  setState(big, C_REC, small, 0, -1);
+  while (true) delay(1000);
+}
+
+// ======================= SCREEN SETUP MODE =======================
+void drawSetupScreen(uint8_t p, uint8_t rot) {
+  int w = tft-&gt;width(), h = tft-&gt;height();
+  tft-&gt;fillScreen(ST77XX_BLACK);
+  tft-&gt;drawRect(0, 0, w, h, ST77XX_WHITE);
+  tft-&gt;drawRect(1, 1, w - 2, h - 2, ST77XX_WHITE);
+  tft-&gt;fillRect(3, 3, 8, 8, ST77XX_RED);
+  tft-&gt;fillRect(w - 11, 3, 8, 8, ST77XX_GREEN);
+  tft-&gt;fillRect(3, h - 11, 8, 8, ST77XX_BLUE);
+  tft-&gt;fillRect(w - 11, h - 11, 8, 8, ST77XX_YELLOW);
+  char r[20];
+  snprintf(r, sizeof(r), "Rotation: %d", rot);
+  int y = 14;
+  textAt(6, y, 1, ST77XX_YELLOW, "SCREEN SETUP");      y += 10;
+  textAt(6, y, 1, ST77XX_CYAN,   PROFILES[p].name);    y += 10;
+  textAt(6, y, 1, ST77XX_CYAN,   r);                   y += 10;
+  textAt(6, y, 1, 0xBDF7,        "GREY : next type");  y += 10;
+  textAt(6, y, 1, ST77XX_WHITE,  "WHITE: rotate");     y += 10;
+  textAt(6, y, 1, 0x5D1F,        "BLUE : save");       y += 10;
+  textAt(6, y, 1, ST77XX_GREEN,  "Good = white frame");y += 10;
+  textAt(6, y, 1, ST77XX_GREEN,  "on all 4 edges and");y += 10;
+  textAt(6, y, 1, ST77XX_GREEN,  "4 colour corners");
+}
+
+void drawSetupButtons() {
+  // four squares: they fill while a button is pressed (button wiring check)
+  const Button *b[4] = { &amp;bRec, &amp;bHigh, &amp;bLow, &amp;bRobot };
+  const uint16_t c[4] = { 0x5D1F, 0xBDF7, 0xFFFF, 0x7BEF };
+  for (int i = 0; i &lt; 4; i++) {
+    int x = 6 + i * 14, y = 108;
+    tft-&gt;fillRect(x, y, 10, 10, b[i]-&gt;stable ? c[i] : ST77XX_BLACK);
+    tft-&gt;drawRect(x, y, 10, 10, c[i]);
+  }
+}
+
+void screenSetup(uint8_t p, uint8_t rot) {
+  Serial.println("SCREEN SETUP: GREY = next type, WHITE = rotate, BLUE = save");
+  while (digitalRead(PIN_BTN_HIGH) == LOW) delay(10);   // wait until GREY is released
+  startDisplay(p, rot);
+  drawSetupScreen(p, rot);
+  drawSetupButtons();
+  uint8_t lastMask = 0;
+  while (true) {
+    bool b = updateButton(bRec);
+    bool g = updateButton(bHigh);
+    bool w = updateButton(bLow);
+    updateButton(bRobot);
+    if (g) { p = (p + 1) % NUM_PROFILES; startDisplay(p, rot); drawSetupScreen(p, rot); lastMask = 0xFF; }
+    if (w) { rot = (rot + 1) &amp; 3; tft-&gt;setRotation(rot); drawSetupScreen(p, rot); lastMask = 0xFF; }
+    if (b) {
+      prefs.putUChar("prof", p);
+      prefs.putUChar("rot", rot);
+      tft-&gt;fillScreen(ST77XX_BLACK);
+      textAt(6, 14, 2, ST77XX_GREEN, "SAVED");
+      Serial.printf("Saved screen type %d (%s), rotation %d\n", p, PROFILES[p].name, rot);
+      delay(700);
+      ESP.restart();
+    }
+    uint8_t mask = (bRec.stable ? 1 : 0) | (bHigh.stable ? 2 : 0) | (bLow.stable ? 4 : 0) | (bRobot.stable ? 8 : 0);
+    if (mask != lastMask) { lastMask = mask; drawSetupButtons(); }
+    delay(5);
+  }
+}
+
+// ======================= AUDIO I/O =======================
+void ampEnable(bool on) {
+  digitalWrite(PIN_AMP_SD, on ? HIGH : LOW);   // HIGH = on (plays LEFT), LOW = shutdown
+}
+
+bool setupI2S() {
+  // ---- mic: port 0, receive, 32-bit stereo (we pick the slot the mic uses) ----
+  i2s_chan_config_t rc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_0, I2S_ROLE_MASTER);
+  rc.dma_desc_num  = DMA_BUFS;
+  rc.dma_frame_num = CHUNK;
+  if (i2s_new_channel(&amp;rc, NULL, &amp;rxChan) != ESP_OK) return false;
+
+  i2s_std_clk_config_t  rclk  = I2S_STD_CLK_DEFAULT_CONFIG(SAMPLE_RATE);
+  i2s_std_slot_config_t rslot = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_32BIT, I2S_SLOT_MODE_STEREO);
+  i2s_std_config_t rs = {};
+  rs.clk_cfg  = rclk;
+  rs.slot_cfg = rslot;
+  rs.gpio_cfg.mclk = I2S_GPIO_UNUSED;
+  rs.gpio_cfg.bclk = (gpio_num_t)PIN_MIC_SCK;
+  rs.gpio_cfg.ws   = (gpio_num_t)PIN_MIC_WS;
+  rs.gpio_cfg.dout = I2S_GPIO_UNUSED;
+  rs.gpio_cfg.din  = (gpio_num_t)PIN_MIC_SD;
+  if (i2s_channel_init_std_mode(rxChan, &amp;rs) != ESP_OK) return false;
+  if (i2s_channel_enable(rxChan) != ESP_OK) return false;
+
+  // ---- amp: port 1, transmit, 16-bit stereo ----
+  i2s_chan_config_t tc = I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_1, I2S_ROLE_MASTER);
+  tc.dma_desc_num  = DMA_BUFS;
+  tc.dma_frame_num = CHUNK;
+  tc.auto_clear    = true;                     // silence when we send nothing
+  if (i2s_new_channel(&amp;tc, &amp;txChan, NULL) != ESP_OK) return false;
+
+  i2s_std_clk_config_t  tclk  = I2S_STD_CLK_DEFAULT_CONFIG(SAMPLE_RATE);
+  i2s_std_slot_config_t tslot = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO);
+  i2s_std_config_t tcfg = {};
+  tcfg.clk_cfg  = tclk;
+  tcfg.slot_cfg = tslot;
+  tcfg.gpio_cfg.mclk = I2S_GPIO_UNUSED;
+  tcfg.gpio_cfg.bclk = (gpio_num_t)PIN_AMP_BCLK;
+  tcfg.gpio_cfg.ws   = (gpio_num_t)PIN_AMP_LRC;
+  tcfg.gpio_cfg.dout = (gpio_num_t)PIN_AMP_DIN;
+  tcfg.gpio_cfg.din  = I2S_GPIO_UNUSED;
+  if (i2s_channel_init_std_mode(txChan, &amp;tcfg) != ESP_OK) return false;
+  if (i2s_channel_enable(txChan) != ESP_OK) return false;
+  return true;
+}
+
+void writeOut() {
+  size_t wr = 0;
+  i2s_channel_write(txChan, outFrame, sizeof(outFrame), &amp;wr, 1000);
+}
+
+void writeSilence(int blocks) {
+  memset(outFrame, 0, sizeof(outFrame));
+  for (int i = 0; i &lt; blocks; i++) writeOut();
+}
+
+// Throw away old mic samples waiting in the I2S buffers.
+void flushMic() {
+  for (int i = 0; i &lt; DMA_BUFS * 2; i++) {
+    size_t got = 0;
+    if (i2s_channel_read(rxChan, micRaw, sizeof(micRaw), &amp;got, 0) != ESP_OK) break;
+    if (got &lt; sizeof(micRaw)) break;
+  }
+}
+
+// Reads one block from the mic into micBlock[]. Returns the number of samples.
+int readMicBlock(uint32_t timeoutMs) {
+  size_t got = 0;
+  i2s_channel_read(rxChan, micRaw, sizeof(micRaw), &amp;got, timeoutMs);
+  int n = got / (2 * sizeof(int32_t));
+  if (n &lt; 2) return 0;
+
+  // which slot is the mic on? (L/R pin on GND = left, but ESP32 can swap them)
+  float dL = 0, dR = 0;
+  for (int i = 1; i &lt; n; i++) {
+    dL += fabsf((float)((micRaw[2 * i] &gt;&gt; 14) - (micRaw[2 * i - 2] &gt;&gt; 14)));
+    dR += fabsf((float)((micRaw[2 * i + 1] &gt;&gt; 14) - (micRaw[2 * i - 1] &gt;&gt; 14)));
+  }
+  micEL = micEL * 0.9f + (dL / n) * 0.1f;
+  micER = micER * 0.9f + (dR / n) * 0.1f;
+  if (!micLock) {
+    if (micRight &amp;&amp; micEL &gt; micER * 2.0f) micRight = false;
+    else if (!micRight &amp;&amp; micER &gt; micEL * 2.0f) micRight = true;
+  }
+
+  int off = micRight ? 1 : 0;
+  for (int i = 0; i &lt; n; i++) {
+    float x = (float)(micRaw[2 * i + off] &gt;&gt; 15);   // INMP441: 24-bit in a 32-bit slot (&gt;&gt;15 = headroom, loud voice does not clip)
+    float y = x - dcX + 0.955f * dcY;                // high-pass ~115 Hz: removes DC, rumble and handling thumps
+    dcX = x; dcY = y;
+    if (y &gt; 32767.0f)  y = 32767.0f;
+    if (y &lt; -32768.0f) y = -32768.0f;
+    micBlock[i] = (int16_t)y;
+  }
+  return n;
+}
+
+bool micDead() { return (micRight ? micER : micEL) &lt; 0.3f; }
+
+void pushHist(const int16_t *b, int n) {
+  if (n &lt;= 0) return;
+  if (n &gt; HIST) n = HIST;
+  memmove(hist, hist + n, (HIST - n) * sizeof(int16_t));
+  memcpy(hist + HIST - n, b, n * sizeof(int16_t));
+}
+
+// Frequency (Hz) of the voice in 512 samples. 0 = too quiet / no clear pitch.
+float detectPitch(const int16_t *x) {
+  float e = 0;
+  for (int i = 0; i &lt; 256; i += 2) e += (float)x[i] * x[i];
+  if (e / 128.0f &lt; 150.0f * 150.0f) return 0;
+  const int L0 = 27, L1 = 256;                 // 593 Hz ... 62 Hz
+  float best = 0;
+  for (int L = L0; L &lt; L1; L++) {
+    float s = 0;
+    for (int i = 0; i &lt; 256; i += 2) s += (float)x[i] * x[i + L];
+    acBuf[L - L0] = s;
+    if (s &gt; best) best = s;
+  }
+  if (best &lt; 0.3f * e) return 0;
+  for (int L = L0 + 1; L &lt; L1 - 1; L++) {      // first strong peak = real pitch
+    float s = acBuf[L - L0];
+    if (s &gt; 0.85f * best &amp;&amp; s &gt;= acBuf[L - L0 - 1] &amp;&amp; s &gt;= acBuf[L - L0 + 1]) return SAMPLE_RATE / (float)L;
+  }
+  return 0;
+}
+
+int blockPeak(const int16_t *b, int n) {
+  int p = 0;
+  for (int i = 0; i &lt; n; i++) {
+    int a = abs((int)b[i]);
+    if (a &gt; p) p = a;
+  }
+  return p;
+}
+
+// Makes the quiet gaps between words quieter, so the hiss there is not heard.
+// Works on the saved recording, in blocks of 16 ms, with smooth gain changes.
+void noiseGate() {
+  uint32_t blocks = recLen / CHUNK;
+  if (blocks &lt; 4) return;
+  float floorRms = 1e9f, topRms = 0;
+  for (uint32_t b = 0; b &lt; blocks; b++) {          // quietest and loudest block
+    float e = 0;
+    for (uint32_t k = 0; k &lt; CHUNK; k += 2) { float v = recBuf[b * CHUNK + k]; e += v * v; }
+    float r = sqrtf(e / (CHUNK / 2));
+    if (r &lt; floorRms) floorRms = r;
+    if (r &gt; topRms) topRms = r;
+  }
+  float thr = floorRms * 2.5f;
+  if (thr &lt; topRms * 0.04f) thr = topRms * 0.04f;
+  if (thr &gt; topRms * 0.25f) return;                // noisy room: gate would chop words, skip it
+  float gNow = 1.0f;
+  for (uint32_t b = 0; b &lt; blocks; b++) {
+    float e = 0;
+    for (uint32_t k = 0; k &lt; CHUNK; k += 2) { float v = recBuf[b * CHUNK + k]; e += v * v; }
+    float r = sqrtf(e / (CHUNK / 2));
+    float target = (r &gt; thr) ? 1.0f : 0.15f;
+    float step = (target &gt; gNow) ? 0.02f : 0.003f;  // open fast (3 ms), close slow (20 ms)
+    for (uint32_t k = 0; k &lt; CHUNK; k++) {
+      gNow += (target - gNow) * step;
+      recBuf[b * CHUNK + k] = (int16_t)(recBuf[b * CHUNK + k] * gNow);
+    }
+  }
+}
+
+// ======================= RECORD (hold BLUE) =======================
+// The mic is read only inside this function, so only while BLUE is held.
+void doRecord() {
+  ampEnable(false);
+  flushMic();                                // drop everything heard before the press
+  recLen = 0;
+  dcX = 0; dcY = 0;
+  memset(hist, 0, sizeof(hist));
+  setState("REC", C_REC, "Release BLUE = stop", 2, 0);
+  tapeClear();
+  setField(0, "MIC --", C_SILK);
+  setField(1, "0.0s", C_DIM);
+
+  bool full = false, dot = true;
+  int slot = 0, slotPeak = 0;
+  uint32_t lastT = 0, lastF = 0, lastDot = millis();
+  char s[16];
+
+  while (true) {
+    updateButton(bRec);
+    if (!bRec.stable) break;                 // button released -&gt; stop recording
+
+    int n = readMicBlock(100);
+    if (n &lt;= 0) continue;
+    pushHist(micBlock, n);
+
+    if (!full) {
+      uint32_t room = recMax - recLen;
+      uint32_t take = ((uint32_t)n &lt; room) ? (uint32_t)n : room;
+      memcpy(recBuf + recLen, micBlock, take * sizeof(int16_t));
+      recLen += take;
+      int pk = blockPeak(micBlock, (int)take);
+      if (pk &gt; slotPeak) slotPeak = pk;
+      int sNow = (int)((uint64_t)recLen * nBars / recMax);
+      while (slot &lt; sNow &amp;&amp; slot &lt; nBars) {  // the tape fills as memory fills
+        tapeBar(slot, barHeight(slotPeak, 3000.0f), C_REC, true);
+        slot++;
+        slotPeak = 0;
+      }
+      if (recLen &gt;= recMax) {
+        full = true;
+        setHint("Memory full. Let go", C_WARN);
+      }
+    }
+
+    // screen: one small job per block, so no sound is lost
+    uint32_t now = millis();
+    if (now - lastDot &gt; 400) {
+      lastDot = now;
+      dot = !dot;
+      drawGlyph(2, dot ? C_REC : C_BG, 3 * 12 * ts);
+    } else if (now - lastT &gt; 200) {
+      lastT = now;
+      snprintf(s, sizeof(s), "%.1fs", recLen / (float)SAMPLE_RATE);
+      setField(1, s, C_DIM);
+    } else if (now - lastF &gt; 400) {
+      lastF = now;
+      float f = detectPitch(hist);
+      if (f &gt; 0) snprintf(s, sizeof(s), "MIC %dHz", (int)(f + 0.5f));
+      else       snprintf(s, sizeof(s), "MIC --");
+      setField(0, s, C_SILK);
+    }
+  }
+
+  micOk = !micDead();
+
+  // drop first 40 ms (button click + mic settling)
+  uint32_t skip = SAMPLE_RATE * 40 / 1000;
+  if (recLen &gt; skip * 2) {
+    memmove(recBuf, recBuf + skip, (recLen - skip) * sizeof(int16_t));
+    recLen -= skip;
+  }
+  // drop last 60 ms (click of the button being released)
+  uint32_t tail = SAMPLE_RATE * 60 / 1000;
+  if (recLen &gt; tail * 2) recLen -= tail;
+
+  if (recLen &lt; SAMPLE_RATE / 10) {           // shorter than 0.1 s
+    recLen = 0;
+    setState("TOO SHORT", C_WARN, "Hold BLUE longer", 0, -1);
+    delay(900);
+    showReady();
+    return;
+  }
+
+  // auto volume: normalise to ~90 % (max gain x8)
+  int32_t peak = 1;
+  for (uint32_t i = 0; i &lt; recLen; i++) {
+    int32_t a = abs((int32_t)recBuf[i]);
+    if (a &gt; peak) peak = a;
+  }
+  float g = 29000.0f / peak;
+  if (g &gt; 16.0f) g = 16.0f;
+  if (g &gt; 1.0f) {
+    for (uint32_t i = 0; i &lt; recLen; i++) recBuf[i] = (int16_t)(recBuf[i] * g);
+  }
+#if NOISE_GATE
+  noiseGate();
+#endif
+  Serial.printf("REC stop: %.2f s, peak %d, gain x%.1f, mic slot %s\n",
+                recLen / (float)SAMPLE_RATE, (int)peak, g, micRight ? "RIGHT" : "LEFT");
+  if (peak &lt; 30) Serial.println("  Very quiet! Check the mic wires (SD D34, WS D33, SCK D32, VDD 3V3).");
+  buildOverview();
+  showReady();
+}
+
+// ======================= EFFECTS =======================
+float sampleAt(float pos) {
+  if (pos &lt; 0) return 0;
+  uint32_t i = (uint32_t)pos;
+  if (i + 1 &gt;= recLen) return 0;
+  float f = pos - (float)i;
+  return recBuf[i] + (recBuf[i + 1] - recBuf[i]) * f;
+}
+
+// Pitch shift with two cross-faded read heads. Keeps the same length.
+float pitchNext(PitchShifter &amp;ps, uint32_t n) {
+  ps.d += 1.0f - ps.ratio;
+  while (ps.d &gt;= ps.win) ps.d -= ps.win;
+  while (ps.d &lt; 0)       ps.d += ps.win;
+  float d2 = ps.d + ps.win * 0.5f;
+  if (d2 &gt;= ps.win) d2 -= ps.win;
+  float w1 = sinf(PI * ps.d / ps.win); w1 *= w1;
+  float w2 = sinf(PI * d2 / ps.win);   w2 *= w2;
+  return sampleAt((float)n - ps.d) * w1 + sampleAt((float)n - d2) * w2;
+}
+
+// Plays the recording with an effect. Returns the next action if a button interrupts.
+Action doPlay(Effect fx) {
+  if (recLen == 0) {
+    setState("NO AUDIO", C_WARN, "Hold BLUE to record", 0, -1);
+    delay(900);
+    showReady();
+    return ACT_NONE;
+  }
+
+  setState(fxName[fx], fxCol[fx], fxHint[fx], 3, (int)fx + 1);
+  drawOverview(C_UPCOMING);
+  setField(0, "IN --", C_SILK);
+  char f[16];
+  if (fx == FX_ROBOT) snprintf(f, sizeof(f), "RING %dHz", (int)ROBOT_HZ);
+  else                snprintf(f, sizeof(f), "OUT --");
+  setField(1, f, fxCol[fx]);
+  memset(hist, 0, sizeof(hist));
+
+  PitchShifter ps = { 1.0f, 0, 800 };
+  if (fx == FX_HIGH) { ps.ratio = PITCH_HIGH; ps.win = 800; }    // 50 ms window
+  if (fx == FX_LOW)  { ps.ratio = PITCH_LOW;  ps.win = 1200; }   // 75 ms window
+  const float ringStep = 2.0f * PI * ROBOT_HZ / SAMPLE_RATE;
+  float ringPh = 0;
+  const float lpA = 1.0f - expf(-2.0f * PI * TONE_CUT_HZ / SAMPLE_RATE);   // treble cut
+  float lp = 0;
+
+  writeSilence(DMA_BUFS);        // push out anything left from an interrupted playback
+  ampEnable(true);
+
+  Action next = ACT_NONE;
+  uint32_t t0 = millis(), lastF = 0;
+  int played = 0;
+
+  for (uint32_t n0 = 0; n0 &lt; recLen; n0 += CHUNK) {
+    uint32_t cnt = recLen - n0;
+    if (cnt &gt; CHUNK) cnt = CHUNK;
+    for (uint32_t k = 0; k &lt; CHUNK; k++) {
+      float y = 0;
+      if (k &lt; cnt) {
+        uint32_t n = n0 + k;
+        if (fx == FX_ROBOT) {
+          y = recBuf[n] * sinf(ringPh) * 1.3f;
+          ringPh += ringStep;
+          if (ringPh &gt; 2.0f * PI) ringPh -= 2.0f * PI;
+        } else {
+          y = pitchNext(ps, n);
+        }
+      }
+      lp += (y - lp) * lpA;
+      y = lp;
+      if (y &gt; 32767.0f)  y = 32767.0f;
+      if (y &lt; -32768.0f) y = -32768.0f;
+      outBlock[k] = (int16_t)y;
+      int16_t v = (int16_t)(y * OUT_VOLUME);
+      outFrame[2 * k]     = v;   // left  (amp plays this, SD = HIGH)
+      outFrame[2 * k + 1] = v;   // right (same, works in any amp mode)
+    }
+    writeOut();
+    pushHist(outBlock, CHUNK);
+
+    // playhead: bars already played take the effect colour
+    int head = (int)((uint64_t)(n0 + cnt) * nBars / recLen);
+    while (played &lt; head &amp;&amp; played &lt; nBars) {
+      tapeBar(played, env[played], fxCol[fx], false);
+      played++;
+    }
+
+    uint32_t now = millis();
+    if (now - t0 &gt; 150 &amp;&amp; now - lastF &gt; 400) {
+      lastF = now;
+      float fin = (n0 + HIST &lt;= recLen) ? detectPitch(recBuf + n0) : 0;
+      if (fin &gt; 0) snprintf(f, sizeof(f), "IN %dHz", (int)(fin + 0.5f));
+      else         snprintf(f, sizeof(f), "IN --");
+      setField(0, f, C_SILK);
+      if (fx != FX_ROBOT) {
+        float fout = detectPitch(hist);
+        if (fout &gt; 0) snprintf(f, sizeof(f), "OUT %dHz", (int)(fout + 0.5f));
+        else          snprintf(f, sizeof(f), "OUT --");
+        setField(1, f, fxCol[fx]);
+      }
+    }
+
+    next = pollButtons();
+    if (next != ACT_NONE) break;
+  }
+
+  if (next == ACT_NONE) {
+    writeSilence(DMA_BUFS + 2);  // let the last sound leave the buffers, then mute
+    ampEnable(false);
+    showReady();
+  } else {
+    ampEnable(false);            // cut at once
+  }
+  return next;
+}
+
+// ======================= SETUP / LOOP =======================
+void setup() {
+  Serial.begin(115200);
+  delay(300);
+  Serial.println("\nESP32 Voice Changer rev 4");
+
+  pinMode(PIN_BTN_REC,   INPUT_PULLUP);
+  pinMode(PIN_BTN_HIGH,  INPUT_PULLUP);
+  pinMode(PIN_BTN_LOW,   INPUT_PULLUP);
+  pinMode(PIN_BTN_ROBOT, INPUT_PULLUP);
+  pinMode(PIN_AMP_SD, OUTPUT);
+  ampEnable(false);
+  delay(50);
+
+  // Screen: hardware SPI routed to D17 (SCK) and D16 (MOSI). No MISO.
+  SPI.begin(PIN_TFT_SCK, -1, PIN_TFT_MOSI, PIN_TFT_CS);
+
+  prefs.begin("voicechg", false);
+  uint8_t prof = prefs.getUChar("prof", 255);
+  uint8_t rot  = prefs.getUChar("rot", 0);
+  if (FORCE_PROFILE &gt;= 0) {
+    prof = (uint8_t)FORCE_PROFILE;
+    rot  = FORCE_ROTATION;
+  } else if (prof &gt;= NUM_PROFILES || digitalRead(PIN_BTN_HIGH) == LOW) {
+    screenSetup(prof &lt; NUM_PROFILES ? prof : 0, rot &amp; 3);   // never returns (restarts)
+  }
+  if (prof &gt;= NUM_PROFILES) prof = 0;
+
+  startDisplay(prof, rot &amp; 3);
+  computeLayout();
+  drawFrame();
+  setState("STARTING", C_GOLD, "Audio...", 0, -1);
+
+  if (!setupI2S()) {
+    Serial.println("I2S start failed");
+    fatal("I2S ERROR", "Audio start failed");
+  }
+  Serial.println("I2S0 mic OK, I2S1 amp OK");
+
+  // one short listen at start-up: find the mic's I2S slot and check that it is alive.
+  // Dead slot = flat line. Slot with wild values = floating wire, not the mic. Mic = the calm live one.
+  for (int i = 0; i &lt; 20; i++) readMicBlock(100);
+  bool liveL = micEL &gt; 0.3f, liveR = micER &gt; 0.3f;
+  if (liveL &amp;&amp; liveR) micRight = (micER &lt; micEL);
+  else                micRight = (liveR &amp;&amp; !liveL);
+  micOk = !micDead();
+  Serial.printf("Mic activity L=%.1f R=%.1f -&gt; slot %s, %s\n", micEL, micER,
+                micRight ? "RIGHT" : "LEFT", micOk ? "signal OK" : "NO SIGNAL (check mic wires)");
+
+  // speaker test: hold WHITE at power-on -&gt; clean 440 Hz tone for 2 s
+  if (digitalRead(PIN_BTN_LOW) == LOW) {
+    setState("SPK TEST", C_GOLD, "440 Hz tone, 2 s", 0, 2);
+    ampEnable(true);
+    float ph = 0;
+    for (int b = 0; b &lt; (SAMPLE_RATE * 2) / CHUNK; b++) {
+      for (int k = 0; k &lt; CHUNK; k++) {
+        int16_t v = (int16_t)(12000.0f * OUT_VOLUME * sinf(ph));
+        ph += 2.0f * PI * 440.0f / SAMPLE_RATE;
+        if (ph &gt; 2.0f * PI) ph -= 2.0f * PI;
+        outFrame[2 * k] = v;
+        outFrame[2 * k + 1] = v;
+      }
+      writeOut();
+    }
+    writeSilence(DMA_BUFS + 2);
+    ampEnable(false);
+    while (digitalRead(PIN_BTN_LOW) == LOW) delay(10);
+  }
+
+  // Record buffer: as big as RAM allows
+  uint32_t want = (uint32_t)SAMPLE_RATE * MAX_SECONDS;
+  if (psramFound()) {
+    recBuf = (int16_t *)ps_malloc(want * sizeof(int16_t));
+    if (recBuf) recMax = want;
+  }
+  if (!recBuf) {
+    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    size_t bytes = (largest &gt; 30000) ? largest - 24000 : 0;   // leave RAM for the system
+    if (bytes &gt; want * sizeof(int16_t)) bytes = want * sizeof(int16_t);
+    recBuf = (int16_t *)malloc(bytes);
+    recMax = recBuf ? bytes / sizeof(int16_t) : 0;
+  }
+  Serial.printf("Max recording: %.2f s\n", recMax / (float)SAMPLE_RATE);
+  if (!recBuf || recMax &lt; SAMPLE_RATE / 2) fatal("RAM ERROR", "Buffer too small");
+
+  showReady();
+}
+
+void loop() {
+  Action a = pollButtons();
+  while (a != ACT_NONE) {
+    switch (a) {
+      case ACT_RECORD: doRecord();           a = ACT_NONE; break;
+      case ACT_HIGH:   a = doPlay(FX_HIGH);  break;
+      case ACT_LOW:    a = doPlay(FX_LOW);   break;
+      case ACT_ROBOT:  a = doPlay(FX_ROBOT); break;
+      default:         a = ACT_NONE;         break;
+    }
+  }
+  delay(5);    // idle: mic data is not read at all
+}
+</template>
+<template id="src-screen">/*
+  ============================================================
+   TEST 1 — DISPLAY ONLY  (1.8" SPI TFT, ST7735 driver, 128x160)
+  ============================================================
+  Wiring:
+    TFT SCL  -&gt; D17   (SPI clock)
+    TFT SDA  -&gt; D16   (SPI data / MOSI)
+    TFT CS   -&gt; D15
+    TFT DC   -&gt; D2    (printed DS on some notes)
+    TFT RST  -&gt; D4
+    TFT BL   -&gt; 3V3   (backlight always on)
+    TFT VCC  -&gt; VIN   (5V, board has its own 3.3 V regulator)
+    TFT GND  -&gt; GND
+
+  Libraries (Arduino IDE &gt; Library Manager):
+    - "Adafruit ST7735 and ST7789 Library"
+    - "Adafruit GFX Library"  (installed automatically with the one above)
+
+  What you should see, in order:
+    1) Full screen RED, GREEN, BLUE, WHITE, BLACK  (checks every pixel + colours)
+    2) Text "SCREEN OK" + pin list                  (checks text / orientation)
+    3) Rectangles, circles, lines                   (checks drawing)
+    4) A moving sine wave, forever                  (checks fast refresh — the
+                                                     same kind of drawing the
+                                                     voice changer will use)
+  Serial Monitor (115200) prints each step.
+
+  If something looks wrong:
+    - White screen only      -&gt; check CS/DC/RST wires and VCC/GND.
+    - Colours swapped (red&lt;-&gt;blue) or 2-3 pixel garbage border
+                             -&gt; change INITR_BLACKTAB below to INITR_GREENTAB
+                                or INITR_REDTAB.
+    - Your screen is 240x240 / 240x320 (ST7789) -&gt; see the ST7789 lines below.
+*/
+
+#include &lt;Adafruit_GFX.h&gt;
+#include &lt;Adafruit_ST7735.h&gt;
+// #include &lt;Adafruit_ST7789.h&gt;   // &lt;- use this instead if your screen is ST7789
+#include &lt;SPI.h&gt;
+
+#define TFT_SCK  17
+#define TFT_MOSI 16
+#define TFT_CS   15
+#define TFT_DC   2
+#define TFT_RST  4
+// D17/D16 are not the default SPI pins, so SPI.begin() in setup()
+// routes the ESP32's hardware SPI to them.
+
+Adafruit_ST7735 tft = Adafruit_ST7735(&amp;SPI, TFT_CS, TFT_DC, TFT_RST);
+// Adafruit_ST7789 tft = Adafruit_ST7789(&amp;SPI, TFT_CS, TFT_DC, TFT_RST); // ST7789 version
+
+void step(const char *msg) {
+  Serial.print("[SCREEN TEST] ");
+  Serial.println(msg);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  step("Starting...");
+
+  SPI.begin(TFT_SCK, -1, TFT_MOSI, TFT_CS);   // SCK, MISO (unused), MOSI, SS
+  tft.initR(INITR_BLACKTAB);   // ST7735 1.8" red board. Try INITR_GREENTAB if colours are off
+  // tft.init(240, 240);       // ST7789 version (or tft.init(240, 320))
+  tft.setRotation(1);          // landscape 160x128. Use 0 for portrait.
+  step("Init done");
+
+  // 1) Colour fills
+  uint16_t colors[] = { ST77XX_RED, ST77XX_GREEN, ST77XX_BLUE, ST77XX_WHITE, ST77XX_BLACK };
+  const char *names[] = { "RED", "GREEN", "BLUE", "WHITE", "BLACK" };
+  for (int i = 0; i &lt; 5; i++) {
+    tft.fillScreen(colors[i]);
+    step(names[i]);
+    delay(600);
+  }
+
+  // 2) Text
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextWrap(false);
+  tft.setTextColor(ST77XX_GREEN);
+  tft.setTextSize(2);
+  tft.setCursor(10, 8);
+  tft.print("SCREEN OK");
+  tft.setTextSize(1);
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setCursor(10, 36);  tft.print("SCL=17  SDA=16");
+  tft.setCursor(10, 48);  tft.print("CS=15  DC=2  RST=4");
+  tft.setCursor(10, 60);  tft.print("BL=3V3  VCC=VIN");
+  tft.setTextColor(ST77XX_YELLOW);
+  tft.setCursor(10, 80);  tft.print("Voice Changer - ESP32");
+  step("Text drawn");
+  delay(2500);
+
+  // 3) Shapes
+  tft.fillScreen(ST77XX_BLACK);
+  tft.drawRect(4, 4, tft.width() - 8, tft.height() - 8, ST77XX_WHITE);
+  tft.fillRect(12, 14, 40, 30, ST77XX_RED);
+  tft.fillCircle(80, 30, 16, ST77XX_GREEN);
+  tft.drawCircle(130, 30, 16, ST77XX_CYAN);
+  for (int x = 12; x &lt; tft.width() - 12; x += 8) {
+    tft.drawLine(x, 70, tft.width() - x, tft.height() - 12, ST77XX_MAGENTA);
+  }
+  step("Shapes drawn");
+  delay(2500);
+
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextColor(ST77XX_CYAN);
+  tft.setTextSize(1);
+  tft.setCursor(4, 4);
+  tft.print("Live wave test");
+  step("Now animating a sine wave forever. Test PASSED if it moves smoothly.");
+}
+
+// 4) Animated wave — erases the old line and draws the new one each frame
+int oldY[320];
+int newY[320];
+bool firstFrame = true;
+float phase = 0;
+
+void loop() {
+  const int w = tft.width();
+  const int top = 16, h = tft.height() - top, mid = top + h / 2;
+  float amp = (h / 2 - 4) * (0.6 + 0.4 * sin(phase * 0.3));
+
+  for (int x = 0; x &lt; w; x++) {
+    newY[x] = mid + (int)(amp * sin(x * 0.08 + phase));
+  }
+  if (!firstFrame) {
+    for (int x = 1; x &lt; w; x++) tft.drawLine(x - 1, oldY[x - 1], x, oldY[x], ST77XX_BLACK); // erase old
+  }
+  for (int x = 1; x &lt; w; x++) tft.drawLine(x - 1, newY[x - 1], x, newY[x], ST77XX_GREEN);   // draw new
+  memcpy(oldY, newY, sizeof(int) * w);
+  firstFrame = false;
+  phase += 0.25;
+  delay(15);
+}
+</template>
+<template id="src-mic">/*
+  ============================================================
+   TEST 2 — MICROPHONE ONLY  (INMP441 I2S microphone)
+  ============================================================
+  Wiring:
+    MIC SCK -&gt; D32   (bit clock, ESP32 drives it)
+    MIC WS  -&gt; D33   (word select / left-right clock, ESP32 drives it)
+    MIC SD  -&gt; D34   (audio data coming OUT of the mic INTO the ESP32)
+    MIC L/R -&gt; GND   (GND = mic talks on the LEFT channel)
+    MIC VDD -&gt; 3V3   (NOT 5V!)
+    MIC GND -&gt; GND
+
+  Board package: "esp32 by Espressif Systems" version 3.x
+  (uses the built-in ESP_I2S library — nothing extra to install).
+
+  How to use:
+    1) Upload, then open  Tools &gt; Serial Plotter  at 115200 baud.
+    2) Stay quiet  -&gt; "level" line should sit low and flat.
+    3) Talk / clap / whistle -&gt; "level" and "peak" jump up.
+    4) Whistle a steady note -&gt; "freq_Hz" shows roughly the pitch
+       (this is the "frequency" your voice changer will play with).
+    Every 2 seconds the Serial Monitor also prints a PASS / FAIL hint.
+
+  If it fails:
+    - Always 0                 -&gt; SD wire (D34) or VDD/GND missing.
+    - Always -1 or huge fixed  -&gt; SCK/WS swapped, or mic not powered.
+    - Works only on RIGHT      -&gt; change I2S_STD_SLOT_LEFT to I2S_STD_SLOT_RIGHT
+                                  (or check that L/R is really on GND).
+*/
+
+#include &lt;ESP_I2S.h&gt;
+
+#define MIC_SCK  32
+#define MIC_WS   33
+#define MIC_SD   34
+
+#define SAMPLE_RATE  16000
+#define N_SAMPLES    512          // one block = 32 ms of audio
+
+I2SClass mic;
+int32_t raw[N_SAMPLES];
+
+unsigned long lastReport = 0;
+float maxLevelSinceReport = 0;
+bool allZero = true, allSame = true;
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n[MIC TEST] Starting INMP441 test...");
+
+  //          BCLK     WS      DOUT  DIN
+  mic.setPins(MIC_SCK, MIC_WS, -1,   MIC_SD);
+
+  if (!mic.begin(I2S_MODE_STD, SAMPLE_RATE, I2S_DATA_BIT_WIDTH_32BIT,
+                 I2S_SLOT_MODE_MONO, I2S_STD_SLOT_LEFT)) {
+    Serial.println("[MIC TEST] FAIL: I2S could not start. Check board package is 3.x.");
+    while (true) delay(1000);
+  }
+  Serial.println("[MIC TEST] I2S started. Open Serial Plotter and make some noise!");
+}
+
+void loop() {
+  size_t bytesRead = mic.readBytes((char *)raw, sizeof(raw));
+  int n = bytesRead / sizeof(int32_t);
+  if (n &lt;= 0) return;
+
+  // INMP441 sends 24-bit audio inside a 32-bit slot (left aligned).
+  // Shift down so numbers are in a friendly range (~16-bit).
+  static float s[N_SAMPLES];
+  float mean = 0;
+  for (int i = 0; i &lt; n; i++) {
+    s[i] = (float)(raw[i] &gt;&gt; 14);
+    mean += s[i];
+    if (raw[i] != 0) allZero = false;
+    if (raw[i] != raw[0]) allSame = false;
+  }
+  mean /= n;
+
+  // Remove DC offset, compute RMS (loudness) and peak
+  float sumSq = 0, peak = 0;
+  int zeroCrossings = 0;
+  float prev = s[0] - mean;
+  for (int i = 0; i &lt; n; i++) {
+    float v = s[i] - mean;
+    sumSq += v * v;
+    if (fabs(v) &gt; peak) peak = fabs(v);
+    if ((prev &lt; 0 &amp;&amp; v &gt;= 0) || (prev &gt; 0 &amp;&amp; v &lt;= 0)) zeroCrossings++;
+    prev = v;
+  }
+  float rms = sqrt(sumSq / n);
+
+  // Very rough pitch estimate: zero crossings / 2 per block -&gt; Hz
+  float freq = (zeroCrossings / 2.0f) * ((float)SAMPLE_RATE / n);
+  if (rms &lt; 30) freq = 0;   // too quiet to trust
+
+  if (rms &gt; maxLevelSinceReport) maxLevelSinceReport = rms;
+
+  // Serial Plotter lines
+  Serial.print("level:");   Serial.print(rms);
+  Serial.print(",peak:");   Serial.print(peak);
+  Serial.print(",freq_Hz:"); Serial.println(freq);
+
+  // Pass / fail hint every 2 s
+  if (millis() - lastReport &gt; 2000) {
+    lastReport = millis();
+    if (allZero) {
+      Serial.println("# [MIC TEST] FAIL: only zeros -&gt; check SD(D34), VDD(3V3), GND.");
+    } else if (allSame) {
+      Serial.println("# [MIC TEST] FAIL: value never changes -&gt; check SCK(D32)/WS(D33).");
+    } else if (maxLevelSinceReport &gt; 300) {
+      Serial.println("# [MIC TEST] PASS: sound detected!");
+    } else {
+      Serial.println("# [MIC TEST] Mic alive (noise floor). Talk or clap to confirm.");
+    }
+    maxLevelSinceReport = 0;
+    allZero = true;
+    allSame = true;
+  }
+}
+</template>
+<template id="src-speaker">/*
+  ============================================================
+   TEST 3 — AMPLIFIER + SPEAKER ONLY  (MAX98357A I2S amp)
+  ============================================================
+  Wiring:
+    AMP BCLK -&gt; D18   (bit clock, ESP32 drives it)
+    AMP LRC  -&gt; D21   (left/right clock = word select)
+    AMP DIN  -&gt; D19   (digital audio going OUT of the ESP32 INTO the amp)
+    AMP SD   -&gt; D5    (code sets it HIGH = amp ON, plays the LEFT channel)
+    AMP VIN  -&gt; VIN/5V of the ESP32 (louder) or 3V3 (quieter)
+    AMP GND  -&gt; GND
+    Speaker  -&gt; the + and - screw terminals on the amp
+
+  Board package: "esp32 by Espressif Systems" version 3.x
+  (uses the built-in ESP_I2S library — nothing extra to install).
+
+  What you should hear, repeating every few seconds:
+    1) Three short beeps at 440 Hz         (amp + speaker alive)
+    2) A smooth sweep from 150 Hz to 2 kHz (whole frequency range works)
+    3) Do-Re-Mi-Fa-Sol-La-Ti-Do scale      (pitch changes = what the voice
+                                            changer will do to your voice)
+  Serial Monitor (115200) tells you which part is playing.
+
+  If it fails:
+    - Silence             -&gt; check SD on D5, VIN + GND, and DIN on D19.
+    - Loud hiss/clicks    -&gt; BCLK and LRC swapped (D18 &lt;-&gt; D21).
+    - Too loud/too quiet  -&gt; change VOLUME below (0.0 ... 1.0).
+*/
+
+#include &lt;ESP_I2S.h&gt;
+
+#define AMP_BCLK  18
+#define AMP_LRC   21
+#define AMP_DIN   19
+#define AMP_SD    5     // HIGH = amp on
+
+#define SAMPLE_RATE 16000
+#define VOLUME      0.15f      // start low to protect your ears and the speaker
+
+I2SClass amp;
+
+// Write `ms` milliseconds of a sine at `freq` Hz (0 = silence)
+void playTone(float freq, int ms) {
+  static float phase = 0;
+  const int CHUNK = 256;
+  int16_t buf[CHUNK * 2];                    // stereo: L, R, L, R...
+  int total = (long)SAMPLE_RATE * ms / 1000;
+  int fade = SAMPLE_RATE / 200;              // 5 ms fade in/out = no clicks
+
+  for (int done = 0; done &lt; total; done += CHUNK) {
+    int n = min(CHUNK, total - done);
+    for (int i = 0; i &lt; n; i++) {
+      int k = done + i;
+      float env = 1.0f;
+      if (k &lt; fade) env = (float)k / fade;
+      if (total - k &lt; fade) env = (float)(total - k) / fade;
+      int16_t v = 0;
+      if (freq &gt; 0) {
+        v = (int16_t)(32767.0f * VOLUME * env * sinf(phase));
+        phase += 2.0f * PI * freq / SAMPLE_RATE;
+        if (phase &gt; 2.0f * PI) phase -= 2.0f * PI;
+      }
+      buf[2 * i]     = v;   // left  (the one the amp plays with SD = HIGH)
+      buf[2 * i + 1] = v;   // right (same, so it works in any amp mode)
+    }
+    amp.write((uint8_t *)buf, n * 2 * sizeof(int16_t));
+  }
+}
+
+void sweep(float f1, float f2, int ms) {
+  int steps = ms / 10;
+  for (int i = 0; i &lt; steps; i++) {
+    float f = f1 * powf(f2 / f1, (float)i / steps);  // log sweep sounds even
+    playTone(f, 10);
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n[SPEAKER TEST] Starting MAX98357A test...");
+
+  pinMode(AMP_SD, OUTPUT);
+  digitalWrite(AMP_SD, HIGH);     // wake the amp
+
+  //          BCLK      WS       DOUT
+  amp.setPins(AMP_BCLK, AMP_LRC, AMP_DIN);
+
+  if (!amp.begin(I2S_MODE_STD, SAMPLE_RATE, I2S_DATA_BIT_WIDTH_16BIT,
+                 I2S_SLOT_MODE_STEREO)) {
+    Serial.println("[SPEAKER TEST] FAIL: I2S could not start. Check board package is 3.x.");
+    while (true) delay(1000);
+  }
+  Serial.println("[SPEAKER TEST] I2S started.");
+}
+
+void loop() {
+  Serial.println("[SPEAKER TEST] 1) Three beeps at 440 Hz");
+  for (int i = 0; i &lt; 3; i++) { playTone(440, 200); playTone(0, 150); }
+  playTone(0, 400);
+
+  Serial.println("[SPEAKER TEST] 2) Sweep 150 Hz -&gt; 2000 Hz");
+  sweep(150, 2000, 2000);
+  playTone(0, 400);
+
+  Serial.println("[SPEAKER TEST] 3) Scale C-D-E-F-G-A-B-C");
+  float scale[] = { 261.6, 293.7, 329.6, 349.2, 392.0, 440.0, 493.9, 523.3 };
+  for (int i = 0; i &lt; 8; i++) { playTone(scale[i], 250); playTone(0, 40); }
+
+  Serial.println("[SPEAKER TEST] Done. If you heard all 3 parts -&gt; PASS. Repeating in 3 s...\n");
+  playTone(0, 3000);   // keep sending silence so the amp doesn't pop
+}
+</template>
+<template id="src-buttons">/*
+  ============================================================
+   BONUS TEST — 4 PUSH BUTTONS ONLY
+  ============================================================
+  Each 4-leg tactile button: the legs are connected in pairs inside.
+  Easiest safe wiring: use two DIAGONAL legs (opposite corners).
+    One diagonal leg  -&gt; GND
+    Other diagonal leg -&gt; its ESP32 pin
+  No resistor needed: the ESP32's internal pull-up is turned on.
+
+    Button 1 (Blue)  -&gt; D27   record
+    Button 2 (Grey)  -&gt; D26   chipmunk
+    Button 3 (White) -&gt; D22   monster
+    Button 4 (Black) -&gt; D23   robot
+
+  Open Serial Monitor at 115200 and press each button:
+    "Button 1 PRESSED" ... "Button 1 released"
+  If a button is always PRESSED -&gt; you used two legs that are already
+  connected inside; rotate the button 90 degrees or use the diagonal legs.
+*/
+
+const int BTN_PINS[4] = { 27, 26, 22, 23 };
+bool lastState[4];
+unsigned long lastChange[4];
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+  Serial.println("\n[BUTTON TEST] Press each button...");
+  for (int i = 0; i &lt; 4; i++) {
+    pinMode(BTN_PINS[i], INPUT_PULLUP);
+    lastState[i] = digitalRead(BTN_PINS[i]);
+    if (lastState[i] == LOW) {
+      Serial.printf("[BUTTON TEST] WARNING: Button %d (D%d) reads PRESSED at start -&gt; check wiring\n",
+                    i + 1, BTN_PINS[i]);
+    }
+  }
+}
+
+void loop() {
+  for (int i = 0; i &lt; 4; i++) {
+    bool s = digitalRead(BTN_PINS[i]);
+    if (s != lastState[i] &amp;&amp; millis() - lastChange[i] &gt; 30) {  // 30 ms debounce
+      lastChange[i] = millis();
+      lastState[i] = s;
+      Serial.printf("[BUTTON TEST] Button %d (D%d) %s\n",
+                    i + 1, BTN_PINS[i], s == LOW ? "PRESSED" : "released");
+    }
+  }
+}
+</template>
+
+<script>
+/* =========================================================
+   DATA — one source of truth for drawing, tables and the check
+   ========================================================= */
+const C={mic:'#7FD3E6',amp:'#F08A4B',tft:'#C4A7FF',btn:'#E9C46A',v3:'#FF6B5B',v5:'#F5A25D',gnd:'#8391A8',silk:'#F2F0E6',dim:'#A6B4CA',gold:'#D9A441'};
+const MONO='IBM Plex Mono, ui-monospace, monospace';
+
+const LEFT=['EN','VP','VN','D34','D35','D32','D33','D25','D26','D27','D14','D12','D13','GND','VIN'];
+const RIGHT=['D23','D22','TX0','RX0','D21','D19','D18','D5','D17','D16','D4','D2','D15','GND','3V3'];
+const BX=470,BY=110,BW=180,BH=545,PY0=250,PSTEP=24;
+const bpY=i=>PY0+i*PSTEP;
+function boardPin(name,side){const arr=side==='L'?LEFT:RIGHT;const i=arr.indexOf(name);if(i<0)throw new Error('No pin '+name);return {x:side==='L'?BX+14:BX+BW-14,y:bpY(i)};}
+
+const RAIL={top3:22,topG:38,top5:54,bot3:692,botG:708};
+
+/* pin: p=name, to=label for tables, kind: 'sig' (to ESP32 pin `pin`), 'rail' (to rail net), 'nc' */
+const COMPS={
+ mic:{ref:'MK1',name:'INMP441 Microphone',short:'Microphone',color:C.mic,side:'L',x:90,y:72,w:150,h:156,py0:100,pstep:22,pins:[
+   {p:'VDD',to:'3V3',kind:'rail',net:'3V3',d:'<b>Power.</b> 3.3 V only. 5 V can damage the mic.'},
+   {p:'GND',to:'GND',kind:'rail',net:'GND',d:'<b>Ground.</b> Shared with the ESP32.'},
+   {p:'L/R',to:'GND',kind:'rail',net:'GND',d:'<b>Channel select.</b> On GND the mic answers in the LEFT slot, and on 3V3 in the RIGHT slot. The test code reads LEFT.',fix:'It doesn\'t output sound. It only chooses which slot the mic uses.'},
+   {p:'SCK',to:'D32',kind:'sig',pin:'D32',d:'<b>Serial Clock.</b> The ESP32 ticks this line, and on every tick the mic sends one bit of the sound sample.',fix:'You wrote that it turns the signal into bits so it can be read. That\'s the right idea, but the ESP32 makes the clock, not the mic.'},
+   {p:'WS',to:'D33',kind:'sig',pin:'D33',d:'<b>Word Select.</b> The ESP32 flips it every sample to say “left slot now” or “right slot now”. How fast it flips sets the sample rate (16 kHz).',fix:'WS doesn\'t carry the sound. It only marks which channel slot is happening.'},
+   {p:'SD',to:'D34',kind:'sig',pin:'D34',d:'<b>Serial Data.</b> The recorded sound, bit by bit, going from the mic into the ESP32. D34 is input-only, which fits perfectly.'}]},
+ amp:{ref:'U2',name:'MAX98357A Amplifier',short:'Amplifier',color:C.amp,side:'R',x:840,y:350,w:150,h:172,py0:370,pstep:22,pins:[
+   {p:'LRC',to:'D21',kind:'sig',pin:'D21',d:'<b>Left/Right Clock.</b> Same job as the mic\'s WS: it tells the amp whether the current sample is for the left or the right channel.'},
+   {p:'BCLK',to:'D18',kind:'sig',pin:'D18',d:'<b>Bit Clock.</b> The ESP32 ticks it, and each tick moves one bit of audio into the amp.',fix:'The sound doesn\'t travel through BCLK. It travels on DIN, and BCLK only sets the timing.'},
+   {p:'DIN',to:'D19',kind:'sig',pin:'D19',d:'<b>Data In.</b> The changed voice, as digital numbers, going from the ESP32 into the amp.'},
+   {p:'GAIN',to:'—',kind:'nc',d:'<b>Gain.</b> Leave it unconnected for 9 dB. Tie it to GND for 12 dB (louder) or to VIN for 6 dB (quieter).'},
+   {p:'SD',to:'D5',kind:'sig',pin:'D5',d:'<b>Shutdown / mode.</b> The firmware drives D5 HIGH only while it plays, so the speaker is silent the rest of the time. HIGH also makes the amp play the LEFT channel.'},
+   {p:'GND',to:'GND',kind:'rail',net:'GND',d:'<b>Ground.</b> Shared with the ESP32.'},
+   {p:'VIN',to:'VIN (5V)',kind:'rail',net:'5V',d:'<b>Power.</b> From the ESP32 VIN pin (5 V from USB) through the 5V rail. 5 V gives the most volume.'}]},
+ tft:{ref:'LCD1',name:'1.8" TFT ST7735',short:'Screen',color:C.tft,side:'R',x:840,y:76,w:225,h:236,py0:110,pstep:24,pins:[
+   {p:'GND',to:'GND',kind:'rail',net:'GND',d:'<b>Ground.</b>'},
+   {p:'VCC',to:'VIN (5V)',kind:'rail',net:'5V',d:'<b>Power</b> for the screen, from VIN (5 V). The red 1.8" board has its own 3.3 V regulator, so 5 V is fine. If its J1 jumper is shorted, use 3V3 instead.'},
+   {p:'SCL',to:'D17',kind:'sig',pin:'D17',d:'<b>SPI Clock.</b> It\'s printed SCL, but this is an SPI screen, so it\'s really SCK. The code routes the hardware SPI clock to D17.'},
+   {p:'SDA',to:'D16',kind:'sig',pin:'D16',d:'<b>SPI Data (MOSI).</b> Commands and pixel colours go from the ESP32 to the screen.'},
+   {p:'RST',to:'D4',kind:'sig',pin:'D4',d:'<b>Reset.</b> Pulled LOW once at start-up so the screen controller starts from a clean state.'},
+   {p:'DC',to:'D2',kind:'sig',pin:'D2',d:'<b>Data / Command</b> (written “DS” in the notes). LOW means the byte is a command. HIGH means it is pixel data.'},
+   {p:'CS',to:'D15',kind:'sig',pin:'D15',d:'<b>Chip Select.</b> When the ESP32 pulls it LOW, the screen knows it\'s the one being addressed.'},
+   {p:'BL',to:'3V3',kind:'rail',net:'3V3',d:'<b>Backlight.</b> On 3V3 it\'s always on.'}]},
+};
+const BTNS=[
+ {id:'b1',label:'SW1',colName:'BLUE',col:'#3B82F6',to:'D27',side:'L',cx:168,cy:400,mode:0},
+ {id:'b2',label:'SW2',colName:'GREY',col:'#9AA3AD',to:'D26',side:'L',cx:168,cy:320,mode:1},
+ {id:'b3',label:'SW3',colName:'WHITE',col:'#F2F2F2',to:'D22',side:'R',cx:950,cy:575,mode:2},
+ {id:'b4',label:'SW4',colName:'BLACK',col:'#16181c',to:'D23',side:'R',cx:950,cy:640,mode:3},
+];
+const MODES=[
+ {name:'REC',ratio:1,desc:'hold to record',col:'#FF3B30'},
+ {name:'CHIPMUNK',ratio:1.6,desc:'pitch ×1.6',col:'#E9C46A'},
+ {name:'MONSTER',ratio:0.65,desc:'pitch ×0.65',col:'#FF7A6B'},
+ {name:'ROBOT',ratio:1,ring:true,desc:'ring modulation at 50 Hz',col:'#7FD3E6'},
+];
+/* final connection list */
+const NOTES=[
+ ['MK1 SCK','D32'],['MK1 WS','D33'],['MK1 SD','D34'],['MK1 L/R','GND'],
+ ['U2 LRC','D21'],['U2 BCLK','D18'],['U2 DIN','D19'],['U2 SD','D5'],
+ ['LCD1 SCL','D17'],['LCD1 SDA','D16'],['LCD1 CS','D15'],['LCD1 DC','D2'],['LCD1 RST','D4'],['LCD1 BL','3V3'],['LCD1 VCC','VIN'],
+ ['SW1','D27'],['SW2','D26'],['SW3','D22'],['SW4','D23'],
+];
+
+/* =========================================================
+   SVG helpers
+   ========================================================= */
+const svg=document.getElementById('wiring'),NS='http://www.w3.org/2000/svg';
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);(p||svg).appendChild(e);return e;}
+function T(x,y,s,a,p){const t=el('text',Object.assign({x,y,'font-family':MONO},a),p);t.textContent=s;return t;}
+function rpath(pts,r=8){
+  pts=pts.filter((p,i)=>i===0||p[0]!==pts[i-1][0]||p[1]!==pts[i-1][1]);
+  let d=`M${pts[0][0]},${pts[0][1]}`;
+  for(let i=1;i<pts.length-1;i++){
+    const [x0,y0]=pts[i-1],[x1,y1]=pts[i],[x2,y2]=pts[i+1];
+    const d1=Math.hypot(x1-x0,y1-y0),d2=Math.hypot(x2-x1,y2-y1),rr=Math.min(r,d1/2,d2/2);
+    d+=` L${x1+(x0-x1)/d1*rr},${y1+(y0-y1)/d1*rr} Q${x1},${y1} ${x1+(x2-x1)/d2*rr},${y1+(y2-y1)/d2*rr}`;
+  }
+  const l=pts[pts.length-1];return d+` L${l[0]},${l[1]}`;
+}
+const defs=el('defs',{});
+defs.innerHTML=`
+ <linearGradient id="can" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#E3E7EA"/><stop offset=".55" stop-color="#9DA5AB"/><stop offset="1" stop-color="#C9CED2"/></linearGradient>
+ <radialGradient id="micCan" cx=".4" cy=".35"><stop offset="0" stop-color="#F4F6F8"/><stop offset="1" stop-color="#8E979E"/></radialGradient>
+ <radialGradient id="cone" cx=".5" cy=".5"><stop offset="0" stop-color="#3a3f48"/><stop offset=".6" stop-color="#1b1e24"/><stop offset="1" stop-color="#0c0e12"/></radialGradient>
+ <radialGradient id="glow"><stop offset="0" stop-color="#7FD3E6" stop-opacity=".9"/><stop offset="1" stop-color="#7FD3E6" stop-opacity="0"/></radialGradient>
+ <filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity=".45"/></filter>`;
+
+const gRails=el('g',{}),gMods=el('g',{}),gWires=el('g',{}),gTop=el('g',{});
+const WIRES=[];      // {group,bus,from,to,paths:[out,main,pulse]}
+const NETLIST=[];    // {from,to}
+
+function wire(pts,color,group,bus,from,to,info){
+  const d=rpath(pts);
+  const g=el('g',{class:'wire','data-group':group},gWires);
+  const out=el('path',{d,class:'w-out'},g);
+  const main=el('path',{d,class:'w-main',stroke:color},g);
+  const pulse=el('path',{d,class:'w-pulse'},g);
+  const hit=el('path',{d,class:'w-hit'},g);
+  const w={group,bus,from,to,g,main,pulse};
+  hit.addEventListener('mouseenter',()=>{info2(`<b>Wire: ${from} → ${to}</b>${info?'<br>'+info:''}`);g.classList.add('hover');});
+  hit.addEventListener('mouseleave',()=>g.classList.remove('hover'));
+  WIRES.push(w);NETLIST.push({from,to});
+  // jumper ends
+  [pts[0],pts[pts.length-1]].forEach(p=>el('circle',{cx:p[0],cy:p[1],r:3.2,fill:color,stroke:'#050913','stroke-width':1.5},g));
+  return w;
+}
+function info2(h){document.getElementById('info').innerHTML=h;}
+
+/* =========================================================
+   Rails (breadboard power rails, top + bottom, joined at edges)
+   ========================================================= */
+function rail(y,x1,x2,col,label){
+  el('line',{x1,y1:y,x2,y2:y,stroke:col,'stroke-width':3.5,'stroke-linecap':'round',opacity:.9},gRails);
+  for(let x=x1+30;x<x2-10;x+=24)el('rect',{x:x-2,y:y-2,width:4,height:4,fill:'#050913',opacity:.55},gRails);
+  T(x1-4,y+3.5,label,{'text-anchor':'end','font-size':9,'font-weight':600,fill:col},gRails);
+}
+rail(RAIL.top3,40,1080,C.v3,'3V3');rail(RAIL.topG,40,1066,C.gnd,'GND');rail(RAIL.top5,40,1080,C.v5,'5V');
+rail(RAIL.bot3,40,1080,C.v3,'3V3');rail(RAIL.botG,40,1066,C.gnd,'GND');
+el('path',{d:`M1080,${RAIL.top3} H1090 V${RAIL.bot3} H1080`,fill:'none',stroke:C.v3,'stroke-width':3,opacity:.8},gRails);
+el('path',{d:`M40,${RAIL.topG} H18 V${RAIL.botG} H40`,fill:'none',stroke:C.gnd,'stroke-width':3,opacity:.8},gRails);
+
+/* =========================================================
+   ESP32 DevKit
+   ========================================================= */
+const esp=el('g',{class:'mod','data-group':'esp',filter:'url(#soft)'},gMods);
+el('rect',{x:BX,y:BY,width:BW,height:BH,rx:7,fill:'#14161b',stroke:'#2c313b','stroke-width':1.5},esp);
+// module PCB + antenna + can
+el('rect',{x:BX+38,y:BY+8,width:BW-76,height:118,rx:3,fill:'#1d2a4a'},esp);
+el('path',{d:`M${BX+48},${BY+30} v-14 h10 v14 h10 v-14 h10 v14 h10 v-14 h10 v14 h10 v-14 h10 v14 h8`,fill:'none',stroke:'#C8A04A','stroke-width':2},esp);
+el('rect',{x:BX+44,y:BY+40,width:BW-88,height:80,rx:3,fill:'url(#can)'},esp);
+T(BX+BW/2,BY+74,'ESP32-WROOM-32',{'text-anchor':'middle','font-size':8.5,'font-weight':600,fill:'#2b3236'},esp);
+T(BX+BW/2,BY+88,'WiFi + BT · 240 MHz',{'text-anchor':'middle','font-size':7,fill:'#4a5458'},esp);
+T(BX,BY-8,'U1 · ESP32 DevKit V1',{'font-size':10,'font-weight':600,fill:C.gold,'letter-spacing':'.06em'},esp);
+// header strips + pins
+[['L',LEFT],['R',RIGHT]].forEach(([s,arr])=>{
+  const x=s==='L'?BX+14:BX+BW-14;
+  el('rect',{x:x-8,y:PY0-12,width:16,height:arr.length*PSTEP,rx:2,fill:'#08090b'},esp);
+  arr.forEach((n,i)=>{
+    const y=bpY(i);
+    el('rect',{x:x-4,y:y-4,width:8,height:8,fill:'#C9A24A',stroke:'#7a5f22','stroke-width':.8},esp);
+    T(s==='L'?x+14:x-14,y+3.5,n,{'text-anchor':s==='L'?'start':'end','font-size':9.5,fill:'#E9ECEF',opacity:.92},esp);
+  });
+});
+T(BX+BW/2,PY0+60,'DEVKIT',{'text-anchor':'middle','font-size':9,fill:'#5d6572','letter-spacing':'.3em'},esp);
+// LEDs, buttons, USB
+const ledPwr=el('circle',{cx:BX+BW/2-22,cy:BY+BH-60,r:4,fill:'#3a1414'},esp);
+const ledIO=el('circle',{cx:BX+BW/2+22,cy:BY+BH-60,r:4,fill:'#10213a'},esp);
+T(BX+BW/2-22,BY+BH-70,'PWR',{'text-anchor':'middle','font-size':6.5,fill:'#8a929c'},esp);
+T(BX+BW/2+22,BY+BH-70,'IO2',{'text-anchor':'middle','font-size':6.5,fill:'#8a929c'},esp);
+[[BX+42,'EN'],[BX+BW-42,'BOOT']].forEach(([x,n])=>{el('rect',{x:x-10,y:BY+BH-42,width:20,height:16,rx:2,fill:'#c8ccd1'},esp);el('circle',{cx:x,cy:BY+BH-34,r:4.5,fill:'#3b3f45'},esp);T(x,BY+BH-46,n,{'text-anchor':'middle','font-size':6.5,fill:'#8a929c'},esp);});
+el('rect',{x:BX+BW/2-17,y:BY+BH-22,width:34,height:24,rx:3,fill:'#b5bcc3',stroke:'#7d858c'},esp);
+el('rect',{x:BX+BW/2-11,y:BY+BH-14,width:22,height:6,rx:1,fill:'#2f3439'},esp);
+esp.addEventListener('click',()=>{select(null);info2('<b>U1 · ESP32 DevKit V1 (30 pins).</b> This is the brain. It reads the mic on I2S port 0, shifts the frequency, sends audio to the amp on I2S port 1, draws on the screen over SPI and reads the four buttons. The red PWR LED lights when it\'s powered.');});
+
+/* =========================================================
+   Modules
+   ========================================================= */
+function modulePins(c,g){
+  c.pins.forEach((p,i)=>{
+    const y=c.py0+i*c.pstep, x=c.side==='L'?c.x+c.w:c.x;
+    p._x=x;p._y=y;
+    const pg=el('g',{class:'pin'},g);
+    el('rect',{x:x-5,y:y-5,width:10,height:10,rx:1.5,fill:p.kind==='nc'?'#5a4a2a':'#C9A24A',stroke:'#050913','stroke-width':1},pg);
+    T(c.side==='L'?x-12:x+12,y+3.5,p.p,{'text-anchor':c.side==='L'?'end':'start','font-size':10,'font-weight':600,fill:'#F4F4F4'},pg);
+    if(p.kind==='nc')T(c.side==='L'?x+10:x+44,y+3.5,c.side==='L'?'not connected':'n/c',{'text-anchor':'start','font-size':8,fill:C.dim,opacity:.75},pg);
+    el('rect',{x:x-16,y:y-9,width:32,height:18,fill:'transparent'},pg);
+    pg.addEventListener('mouseenter',()=>info2(`<b>${c.ref} · ${c.short} · ${p.p} → ${p.to}</b><br>${p.d}${p.fix?`<span class="fix">Correction: ${p.fix}</span>`:''}`));
+  });
+}
+function moduleClick(key,g,c){g.addEventListener('click',()=>{select(key);info2(`<b>${c.ref} · ${c.name}.</b> Its wires are highlighted. Hover a pin or a wire to read what it does. Press “Show all wires” to go back.`);});}
+
+/* MK1 — INMP441 (blue round-corner breakout, mic can in the middle) */
+const mc=COMPS.mic;
+const gMic=el('g',{class:'mod','data-group':'mic',filter:'url(#soft)'},gMods);
+el('rect',{x:mc.x,y:mc.y,width:mc.w,height:mc.h,rx:22,fill:'#1d3a8f',stroke:'#2d4fb3','stroke-width':1.5},gMic);
+const micGlow=el('circle',{cx:mc.x+58,cy:mc.y+82,r:44,fill:'url(#glow)',opacity:0},gMic);
+el('circle',{cx:mc.x+58,cy:mc.y+82,r:26,fill:'url(#micCan)',stroke:'#6b737a'},gMic);
+el('circle',{cx:mc.x+58,cy:mc.y+82,r:5,fill:'#1a1d21'},gMic);
+T(mc.x+58,mc.y+132,'INMP441',{'text-anchor':'middle','font-size':10,'font-weight':600,fill:'#e8edff'},gMic);
+T(mc.x,mc.y-8,'MK1 · Microphone',{'font-size':10,'font-weight':600,fill:C.gold,'letter-spacing':'.06em'},gMic);
+modulePins(mc,gMic);moduleClick('mic',gMic,mc);
+
+/* U2 — MAX98357A (purple board, chip, blue screw terminal) + LS1 speaker — right side */
+const ac=COMPS.amp;
+const gAmp=el('g',{class:'mod','data-group':'amp',filter:'url(#soft)'},gMods);
+el('rect',{x:ac.x,y:ac.y,width:ac.w,height:ac.h,rx:6,fill:'#4b2a86',stroke:'#6a44b0','stroke-width':1.5},gAmp);
+el('rect',{x:ac.x+70,y:ac.y+58,width:34,height:34,rx:2,fill:'#16161a'},gAmp);
+T(ac.x+87,ac.y+78,'98357',{'text-anchor':'middle','font-size':7,fill:'#777'},gAmp);
+el('rect',{x:ac.x+ac.w-28,y:ac.y+108,width:30,height:52,rx:2,fill:'#2563c9',stroke:'#1b4a99'},gAmp);
+[ac.y+121,ac.y+147].forEach(y=>{el('circle',{cx:ac.x+ac.w-13,cy:y,r:7,fill:'#b8bfc6'},gAmp);el('line',{x1:ac.x+ac.w-18,y1:y,x2:ac.x+ac.w-8,y2:y,stroke:'#555','stroke-width':2},gAmp);});
+T(ac.x+92,ac.y+22,'MAX98357A',{'text-anchor':'middle','font-size':10,'font-weight':600,fill:'#efe6ff'},gAmp);
+T(ac.x+92,ac.y+34,'I2S 3W CLASS D',{'text-anchor':'middle','font-size':7,fill:'#c9b8ee'},gAmp);
+T(ac.x,ac.y-8,'U2 · Amplifier',{'font-size':10,'font-weight':600,fill:C.gold,'letter-spacing':'.06em'},gAmp);
+modulePins(ac,gAmp);moduleClick('amp',gAmp,ac);
+// speaker
+const SPX=1045,SPY=ac.y+250;
+const gSpk=el('g',{class:'mod','data-group':'amp'},gMods);
+el('circle',{cx:SPX,cy:SPY,r:32,fill:'#0c0e12',stroke:'#59606b','stroke-width':3},gSpk);
+const cone=el('g',{},gSpk);
+el('circle',{cx:SPX,cy:SPY,r:24,fill:'url(#cone)'},cone);
+el('circle',{cx:SPX,cy:SPY,r:8,fill:'#2b2f36',stroke:'#4a505a'},cone);
+T(SPX,SPY+48,'LS1 · Speaker',{'text-anchor':'middle','font-size':9,'font-weight':600,fill:C.gold},gSpk);
+el('path',{d:rpath([[ac.x+ac.w-2,ac.y+121],[SPX+6,ac.y+121],[SPX+6,SPY-32]]),fill:'none',stroke:'#e5484d','stroke-width':3},gSpk);
+el('path',{d:rpath([[ac.x+ac.w-2,ac.y+147],[SPX-6,ac.y+147],[SPX-6,SPY-32]]),fill:'none',stroke:'#1a1a1a','stroke-width':3},gSpk);
+gSpk.addEventListener('mouseenter',()=>info2('<b>LS1 · Speaker (4–8 Ω, about 3 W).</b> Its red (+) and black (−) wires go into the blue screw terminal on the amp. It doesn\'t connect to the ESP32. The cone moves with the sound.'));
+gSpk.addEventListener('click',()=>select('amp'));
+
+/* LCD1 — 1.8" ST7735 (red board, live screen) */
+const tc=COMPS.tft;
+const gTft=el('g',{class:'mod','data-group':'tft',filter:'url(#soft)'},gMods);
+el('rect',{x:tc.x,y:tc.y,width:tc.w,height:tc.h,rx:6,fill:'#b3261e',stroke:'#d23c32','stroke-width':1.5},gTft);
+[[tc.x+tc.w-10,tc.y+10],[tc.x+tc.w-10,tc.y+tc.h-10],[tc.x+10,tc.y+tc.h-10]].forEach(([x,y])=>el('circle',{cx:x,cy:y,r:4.5,fill:'#14161b',stroke:'#e2b04a'},gTft));
+el('rect',{x:tc.x+52,y:tc.y+18,width:168,height:136,rx:2,fill:'#050608'},gTft);
+const fo=el('foreignObject',{x:tc.x+56,y:tc.y+22,width:160,height:128},gTft);
+fo.innerHTML='<canvas xmlns="http://www.w3.org/1999/xhtml" id="tftMini" width="160" height="128" style="width:160px;height:128px;display:block;image-rendering:pixelated"></canvas>';
+T(tc.x+136,tc.y+178,'1.8" TFT SPI 128×160',{'text-anchor':'middle','font-size':9,fill:'#ffd9d4'},gTft);
+T(tc.x+136,tc.y+192,'ST7735',{'text-anchor':'middle','font-size':8,fill:'#ffb4aa'},gTft);
+T(tc.x,tc.y-8,'LCD1 · Screen',{'font-size':10,'font-weight':600,fill:C.gold,'letter-spacing':'.06em'},gTft);
+modulePins(tc,gTft);moduleClick('tft',gTft,tc);
+
+/* SW1–SW4 — 4-leg tactile buttons */
+BTNS.forEach(b=>{
+  const g=el('g',{class:'mod btnmod','data-group':b.id,filter:'url(#soft)'},gMods);
+  const {cx,cy}=b;
+  [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx,sy])=>el('rect',{x:cx+sx*18-(sx<0?10:0),y:cy+sy*12-2,width:10,height:4,fill:'#c3c9cf'},g));
+  el('rect',{x:cx-18,y:cy-18,width:36,height:36,rx:3,fill:'#1a1c20',stroke:'#3a3f47'},g);
+  [[-12,-12],[12,-12],[-12,12],[12,12]].forEach(([dx,dy])=>el('circle',{cx:cx+dx,cy:cy+dy,r:2,fill:'#0b0c0e'},g));
+  b._cap=el('circle',{cx,cy,r:10,fill:b.col,stroke:'#4a4f58','stroke-width':1.5},g);
+  const lt=T(b.side==='L'?cx-14:cx+14,cy-25,'',{'text-anchor':b.side==='L'?'start':'end','font-size':9.5,'font-weight':600,fill:C.gold},g);
+  lt.innerHTML=`${b.label} ${b.colName} <tspan fill="${C.dim}" font-weight="500">· ${MODES[b.mode].name}${b.mode===0?' (hold)':''}</tspan>`;
+  // legs used: signal = top leg toward the board, GND = opposite diagonal
+  b._sig=b.side==='L'?[cx+28,cy-12]:[cx-28,cy-12];
+  b._gnd=b.side==='L'?[cx-28,cy+12]:[cx+28,cy+12];
+  g.style.cursor='pointer';
+  g.addEventListener('pointerdown',e=>{e.preventDefault();b._cap.setAttribute('r',8.5);btnDown(b.mode);});
+  ['pointerup','pointerleave'].forEach(ev=>g.addEventListener(ev,()=>{b._cap.setAttribute('r',10);btnUp(b.mode);}));
+  g.addEventListener('mouseenter',()=>info2(`<b>${b.label} (${b.colName}) → ${b.to} · ${b.mode===0?'hold to record':'play as '+MODES[b.mode].name.toLowerCase()}</b>. One diagonal leg goes to ${b.to} and the other to GND. With INPUT_PULLUP the pin reads HIGH when released and LOW when pressed. ${b.mode===0?'Press and hold it to record.':'Click to press it.'}`));
+});
+
+/* =========================================================
+   Wires
+   ========================================================= */
+// signal wires to ESP32 header pins, routed in lanes
+const sigL=[],sigR=[];
+COMPS.mic.pins.filter(p=>p.kind==='sig').forEach(p=>sigL.push({c:COMPS.mic,p,x:p._x,y:p._y,pin:p.pin,color:C.mic,group:'mic',bus:'mic',from:`MK1 ${p.p}`}));
+COMPS.amp.pins.filter(p=>p.kind==='sig').forEach(p=>sigR.push({c:COMPS.amp,p,x:p._x,y:p._y,pin:p.pin,color:C.amp,group:'amp',bus:'amp',from:`U2 ${p.p}`}));
+COMPS.tft.pins.filter(p=>p.kind==='sig').forEach(p=>sigR.push({c:COMPS.tft,p,x:p._x,y:p._y,pin:p.pin,color:C.tft,group:'tft',bus:'tft',from:`LCD1 ${p.p}`}));
+BTNS.forEach(b=>(b.side==='L'?sigL:sigR).push({x:b._sig[0],y:b._sig[1],pin:b.to,color:C.btn,group:b.id,bus:'btn',from:b.label,btn:b}));
+function routeSide(list,side){
+  list.sort((a,b)=>a.y-b.y);
+  const n=list.length;
+  list.forEach((w,i)=>{
+    const t=boardPin(w.pin,side);
+    const lane=side==='L'?452-i*(150/(n-1)):666+i*(100/(n-1));
+    const desc=w.p?w.p.d.replace(/<[^>]+>/g,''):`Button ${w.from}: pressed = LOW.`;
+    wire([[w.x,w.y],[lane,w.y],[lane,t.y],[t.x,t.y]],w.color,w.group,w.bus,w.from,w.pin,desc);
+  });
+}
+routeSide(sigL,'L');routeSide(sigR,'R');
+
+// module pins that go to a power rail
+function railWire(c,group,offsets){
+  c.pins.filter(p=>p.kind==='rail').forEach((p,k)=>{
+    const dir=c.side==='L'?1:-1, x=p._x+dir*offsets[k];
+    const y=p.net==='3V3'?RAIL.top3:p.net==='5V'?RAIL.top5:RAIL.topG;
+    const col=p.net==='3V3'?C.v3:p.net==='5V'?C.v5:C.gnd, bus=p.net==='3V3'?'v3':p.net==='5V'?'v5':'gnd';
+    wire([[p._x,p._y],[x,p._y],[x,y]],col,group,bus,`${c.ref} ${p.p}`,p.net+' rail',p.d.replace(/<[^>]+>/g,''));
+  });
+}
+railWire(COMPS.mic,'mic',[12,22,32]);      // VDD, GND, L/R
+railWire(COMPS.amp,'amp',[44,54]);         // GND, VIN
+railWire(COMPS.tft,'tft',[12,22,34]);      // GND, VCC, BL
+// buttons' GND legs to the bottom GND rail
+BTNS.forEach(b=>{const [x,y]=b._gnd,dx=b.side==='L'?-8:8;wire([[x,y],[x+dx,y],[x+dx,RAIL.botG]],C.gnd,b.id,'gnd',b.label+' (other leg)','GND rail','The other diagonal leg of the button goes to ground.');});
+// ESP32 power to the bottom rails
+(()=>{const p3=boardPin('3V3','R'),pg=boardPin('GND','R');
+  wire([[p3.x,p3.y],[p3.x+20,p3.y],[p3.x+20,RAIL.bot3]],C.v3,'esp','v3','ESP32 3V3','3V3 rail','The ESP32\'s 3.3 V regulator feeds the 3V3 rails. Top and bottom rails are joined at the edge.');
+  wire([[pg.x,pg.y],[pg.x+30,pg.y],[pg.x+30,RAIL.botG]],C.gnd,'esp','gnd','ESP32 GND','GND rail','ESP32 ground feeds the GND rails. Every module\'s ground must be connected here.');
+  const pv=boardPin('VIN','L');
+  wire([[pv.x,pv.y],[pv.x-22,pv.y],[pv.x-22,672],[28,672],[28,RAIL.top5],[40,RAIL.top5]],C.v5,'esp','v5','ESP32 VIN','5V rail','VIN carries 5 V from USB. It feeds the 5V rail, which powers the amp and the screen.');})();
+
+gWires.parentNode.appendChild(gWires); // wires above modules so ends meet the pads
+svg.appendChild(gTop);
+
+/* highlight */
+function select(key){
+  svg.classList.toggle('focus',key!==null);
+  WIRES.forEach(w=>w.g.classList.toggle('sel',w.group===key));
+  svg.querySelectorAll('.mod').forEach(m=>m.classList.toggle('sel',m.dataset.group===key));
+}
+document.getElementById('resetView').addEventListener('click',()=>{select(null);info2('Showing all wires. Click a module to highlight its wires.');});
+
+
+
+/* ---------- tabs helper ---------- */
+function tabs(barId,items,render){
+  const bar=document.getElementById(barId);
+  items.forEach((it,i)=>{
+    const b=document.createElement('button');b.className='tab';b.setAttribute('role','tab');
+    b.innerHTML=`<small>${it.ref}</small>${it.label}`;
+    b.addEventListener('click',()=>{bar.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-selected','false'));b.setAttribute('aria-selected','true');render(it);});
+    bar.appendChild(b); if(i===0){b.setAttribute('aria-selected','true');render(it);}
+  });
+}
+tabs('pinTabs',Object.values(COMPS).map(c=>({ref:c.ref,label:c.short,c})),({c})=>{
+  let h=`<table><tr><th>Pin</th><th>ESP32</th><th>What it does</th></tr>`;
+  c.pins.forEach(p=>{h+=`<tr><td class="p"><span class="sw" style="background:${c.color}"></span>${p.p}</td><td class="t">${p.to}</td><td>${p.d}${p.fix?`<span class="fix">${p.fix}</span>`:''}</td></tr>`;});
+  if(c.ref==='U2')h+=`<tr><td class="p"><span class="sw" style="background:${C.silk}"></span>+ / −</td><td class="t">LS1</td><td>The two screw terminals go to the speaker wires. They carry the amplified analog sound.</td></tr>`;
+  document.getElementById('pinBody').innerHTML=h+'</table>';
+});
+
+const CODES=[
+ {ref:'U1',label:'Final firmware',src:'src-final',file:'VoiceChanger.ino',note:'<b>The full voice changer.</b> First start opens SCREEN SETUP: press GREY until the white frame touches all 4 edges, WHITE rotates, BLUE saves. Then hold BLUE to record, let go, and press GREY, WHITE or BLACK.'},
+ {ref:'LCD1',label:'Screen',src:'src-screen',file:'test_screen.ino',note:'<b>You should see</b> red, green, blue, white and black, then “SCREEN OK”, then shapes, then a moving wave. If the colours are swapped, change <code>INITR_BLACKTAB</code> to <code>INITR_GREENTAB</code>.'},
+ {ref:'MK1',label:'Microphone',src:'src-mic',file:'test_mic.ino',note:'<b>You should see</b> in Tools → Serial Plotter: low lines when it\'s quiet that jump when you talk or clap. Whistle a steady note and <code>freq_Hz</code> shows its pitch.'},
+ {ref:'U2',label:'Speaker',src:'src-speaker',file:'test_speaker.ino',note:'<b>You should hear</b> three beeps, a rising sweep, then a do-re-mi scale, on repeat. Volume starts at 15% (<code>VOLUME</code>).'},
+ {ref:'SW1–4',label:'Buttons',src:'src-buttons',file:'test_buttons.ino',note:'<b>You should see</b> “Button N PRESSED” and “released” in the Serial Monitor for each button.'},
+];
+function highlight(txt){
+  const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const re=/(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|("[^"\n]*")|(#\w+)|\b(void|int|float|bool|const|for|if|else|while|return|true|false|static|size_t|int16_t|int32_t|uint8_t|uint16_t|unsigned|long|char)\b|\b(\d+(?:\.\d+)?f?)\b/g;
+  let out='',last=0,m;
+  while((m=re.exec(txt))){out+=esc(txt.slice(last,m.index));const cls=m[1]?'c-com':m[2]?'c-str':m[3]?'c-pp':m[4]?'c-kw':'c-num';out+=`<span class="${cls}">${esc(m[0])}</span>`;last=re.lastIndex;}
+  return out+esc(txt.slice(last));
+}
+let currentCode='';
+tabs('codeTabs',CODES,it=>{
+  currentCode=document.getElementById(it.src).content.textContent.replace(/^\n/,'');
+  document.getElementById('code').innerHTML=highlight(currentCode);
+  document.getElementById('codeNote').innerHTML=`<code>${it.file}</code> · ${it.note}`;
+});
+document.getElementById('copy').addEventListener('click',async e=>{
+  const b=e.currentTarget;
+  try{await navigator.clipboard.writeText(currentCode);b.textContent='Copied';}
+  catch(err){const r=document.createRange();r.selectNodeContents(document.getElementById('code'));const s=getSelection();s.removeAllRanges();s.addRange(r);b.textContent='Selected · press Ctrl+C';}
+  setTimeout(()=>b.textContent='Copy code',2000);
+});
+
+
+
+/* =========================================================
+   On-page buttons
+   ========================================================= */
+const keys=document.getElementById('keys');
+BTNS.forEach(b=>{
+  const k=document.createElement('button');k.className='key';k.id='k'+b.id;
+  k.innerHTML=`<span class="cap" style="background:${b.col}"></span><b>${b.label}</b><small>${b.colName}</small><small>${MODES[b.mode].name}</small><small>${b.to}</small>`;
+  k.addEventListener('pointerdown',e=>{e.preventDefault();btnDown(b.mode);});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>k.addEventListener(ev,()=>btnUp(b.mode)));
+  k.addEventListener('keydown',e=>{if((e.key===' '||e.key==='Enter')&&!e.repeat){e.preventDefault();btnDown(b.mode);}});
+  k.addEventListener('keyup',e=>{if(e.key===' '||e.key==='Enter'){e.preventDefault();btnUp(b.mode);}});
+  keys.appendChild(k);
+});
+
+/* serial */
+const ser=document.getElementById('serial');
+function log(s){const t=(performance.now()/1000).toFixed(2).padStart(7,' ');ser.textContent+=`[${t}] ${s}\n`;ser.scrollTop=ser.scrollHeight;}
+log('rst:0x1 (POWERON_RESET)');
+log('Waiting for power. Press "Power on".');
+
+/* =========================================================
+   Audio engine
+   ========================================================= */
+let ctx=null,running=false,mode=-1,proc=null,anIn,anOut,outGain,inGain;
+let srcMode='demo',srcNode=null,userBuffer=null,micStream=null,demoTimer=null,demoNodes=null;
+const PS={buf:null,N:0,w:0,p:0,ring:0};
+/* same logic as the firmware: record while SW1 is held, play back with an effect */
+const REC={buf:null,len:0,on:false,held:false,full:false,fullLogged:false,play:-1,fx:1,done:false};
+let toast=null;
+
+function show(m){
+  mode=m;
+  BTNS.forEach(b=>{const on=b.mode===m;b._cap.setAttribute('stroke',on?C.gold:'#4a4f58');b._cap.setAttribute('stroke-width',on?3:1.5);document.getElementById('k'+b.id).classList.toggle('active',on);});
+}
+let ioBlink=0;
+function flashBtn(b){
+  WIRES.filter(w=>w.group===b.id&&w.bus==='btn').forEach(w=>{w.g.classList.add('flash');setTimeout(()=>w.g.classList.remove('flash'),450);});
+  ioBlink=performance.now();
+}
+function msg(big,small,col){toast={big,small,col,until:performance.now()+900};}
+function btnDown(m){
+  const b=BTNS.find(x=>x.mode===m);flashBtn(b);
+  if(m===0){
+    if(REC.held)return;
+    log(`${b.label} ${b.colName} (${b.to}) LOW → REC start (hold)`);
+    if(!running){log('  The board is off. Press "Power on" first.');return;}
+    REC.play=-1;REC.len=0;REC.full=false;REC.fullLogged=false;REC.held=true;REC.on=true;show(0);
+    return;
+  }
+  log(`${b.label} ${b.colName} (${b.to}) LOW → PLAY ${MODES[m].name}`);
+  if(!running){log('  The board is off. Press "Power on" first.');return;}
+  if(REC.held)return;                       // firmware ignores effects while recording
+  if(!REC.len){log('  NO AUDIO: hold SW1 to record first.');msg('NO AUDIO','Hold BLUE to record','#FF9500');return;}
+  PS.buf.fill(0);PS.w=0;PS.p=0;PS.ring=0;REC.fx=m;REC.play=0;show(m);
+}
+function btnUp(m){
+  if(m!==0||!REC.held)return;
+  REC.held=false;REC.on=false;finishRec();
+}
+function finishRec(){
+  const sr=ctx.sampleRate,skip=Math.round(sr*.04);
+  if(REC.len>skip*2){REC.buf.copyWithin(0,skip,REC.len);REC.len-=skip;}
+  if(REC.len<sr*.1){REC.len=0;log('  TOO SHORT: hold SW1 longer.');msg('TOO SHORT','Hold BLUE longer','#FF9500');show(-1);return;}
+  let peak=1e-6;for(let i=0;i<REC.len;i++){const a=Math.abs(REC.buf[i]);if(a>peak)peak=a;}
+  const g=Math.min(8,.9/peak);if(g>1)for(let i=0;i<REC.len;i++)REC.buf[i]*=g;
+  log(`REC stop: ${(REC.len/sr).toFixed(2)} s, gain x${Math.max(1,g).toFixed(1)}. Press SW2, SW3 or SW4.`);
+  show(-1);
+}
+
+function makeProc(){
+  const sr=ctx.sampleRate;PS.N=Math.round(sr*.05);PS.buf=new Float32Array(PS.N*2);PS.w=0;PS.p=0;
+  const p=ctx.createScriptProcessor(1024,1,1);
+  p.onaudioprocess=e=>{
+    const inp=e.inputBuffer.getChannelData(0),out=e.outputBuffer.getChannelData(0),N=PS.N,B=PS.buf,L=B.length;
+    const rd=ph=>{let r=PS.w-(ph*N+2);while(r<0)r+=L;const i0=Math.floor(r),f=r-i0;return B[i0%L]*(1-f)+B[(i0+1)%L]*f;};
+    for(let i=0;i<inp.length;i++){
+      if(REC.on){                                   // recording: store, speaker silent
+        if(REC.len<REC.buf.length)REC.buf[REC.len++]=inp[i];else{REC.on=false;REC.full=true;}
+        out[i]=0;continue;
+      }
+      if(REC.play<0){out[i]=0;continue;}             // idle: amp is off
+      if(REC.play>=REC.len){REC.play=-1;REC.done=true;out[i]=0;continue;}
+      const x=REC.buf[REC.play++],M=MODES[REC.fx];B[PS.w]=x;let y=x;
+      if(M.ratio!==1){PS.p+=(1-M.ratio)/N;if(PS.p>=1)PS.p-=1;if(PS.p<0)PS.p+=1;const p1=PS.p,p2=(PS.p+.5)%1,w1=Math.sin(Math.PI*p1),w2=Math.sin(Math.PI*p2);y=rd(p1)*w1*w1+rd(p2)*w2*w2;}
+      if(M.ring){PS.ring+=2*Math.PI*50/sr;if(PS.ring>6.2832)PS.ring-=6.2832;y=x*Math.sin(PS.ring)*1.6;}
+      out[i]=y;PS.w=(PS.w+1)%L;
+    }
+  };return p;
+}
+function demoVoice(dest){
+  const osc=ctx.createOscillator();osc.type='sawtooth';osc.frequency.value=130;
+  const vib=ctx.createOscillator();vib.frequency.value=5;const vg=ctx.createGain();vg.gain.value=3;vib.connect(vg).connect(osc.frequency);
+  const env=ctx.createGain();env.gain.value=0;const sum=ctx.createGain();sum.gain.value=.9;
+  const F=[0,1,2].map(()=>{const f=ctx.createBiquadFilter();f.type='bandpass';f.Q.value=8;osc.connect(f);const g=ctx.createGain();f.connect(g).connect(sum);return {f,g};});
+  sum.connect(env).connect(dest);osc.start();vib.start();
+  const V=[[730,1090,2440],[270,2290,3010],[300,870,2240],[530,1840,2480],[570,840,2410],[660,1720,2410]],G=[1,.5,.25];
+  let t=ctx.currentTime+.05;
+  function sched(){while(t<ctx.currentTime+1){const n=1+Math.floor(Math.random()*3);for(let w=0;w<n;w++){const v=V[Math.floor(Math.random()*V.length)],dur=.14+Math.random()*.16;F.forEach((fm,k)=>{fm.f.frequency.setTargetAtTime(v[k],t,.03);fm.g.gain.setValueAtTime(G[k]*3,t);});osc.frequency.setTargetAtTime(115+Math.random()*45,t,.05);env.gain.setTargetAtTime(.9,t,.02);env.gain.setTargetAtTime(0,t+dur,.03);t+=dur+.05;}t+=.25+Math.random()*.3;}}
+  sched();demoTimer=setInterval(sched,300);demoNodes=[osc,vib,sum,env];
+}
+function stopSrc(){
+  if(demoTimer){clearInterval(demoTimer);demoTimer=null;}
+  if(demoNodes){demoNodes.forEach(n=>{try{n.stop&&n.stop()}catch(e){}try{n.disconnect()}catch(e){}});demoNodes=null;}
+  if(srcNode){try{srcNode.stop&&srcNode.stop()}catch(e){}try{srcNode.disconnect()}catch(e){}srcNode=null;}
+  if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}
+}
+async function startSrc(){
+  stopSrc();
+  if(srcMode==='file'&&userBuffer){
+    srcNode=ctx.createBufferSource();srcNode.buffer=userBuffer;srcNode.loop=true;srcNode.connect(inGain);srcNode.start();
+    log('Mic input: your audio file (looping)');
+  }else if(srcMode==='mic'){
+    try{
+      if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('not supported');
+      micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:false,autoGainControl:false}});
+      srcNode=ctx.createMediaStreamSource(micStream);srcNode.connect(inGain);
+      log('Mic input: your microphone (live)');
+    }catch(err){
+      log('Microphone not available here ('+(err.name||err.message)+'). Switching to the demo voice.');
+      note('The microphone was blocked. Open the downloaded HTML file in Chrome or Edge and allow the mic when asked.');
+      setSrc('demo',true);return startSrc();
+    }
+  }else{
+    demoVoice(inGain);log('Mic input: demo voice');
+  }
+}
+function note(s){document.getElementById('srcNote').textContent=s;}
+function setSrc(m,silent){
+  srcMode=m;
+  document.querySelectorAll('#srcSeg [data-src]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.src===m)));
+  document.querySelector('#srcSeg .segfile').classList.toggle('on',m==='file');
+  if(!silent){
+    note(m==='mic'?'Wear headphones, or the speaker will feed back into the mic and howl.':m==='file'?'Your file loops through the voice changer.':'A synthetic voice that talks in short bursts.');
+    if(running)startSrc();
+  }
+}
+document.querySelectorAll('#srcSeg [data-src]').forEach(b=>b.addEventListener('click',()=>setSrc(b.dataset.src)));
+const segFile=document.querySelector('#srcSeg .segfile');
+segFile.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();document.getElementById('file').click();}});
+document.getElementById('file').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{
+    ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();
+    userBuffer=await ctx.decodeAudioData(await f.arrayBuffer());
+    log(`Loaded "${f.name}" (${userBuffer.duration.toFixed(1)} s)`);
+    setSrc('file');
+    if(!running)log('Press "Power on" to play it through the voice changer.');
+  }catch(err){log('Could not read that file. Try an .mp3, .wav or .m4a recording.');}
+});
+document.getElementById('vol').addEventListener('input',e=>{if(outGain)outGain.gain.value=+e.target.value;});
+
+async function powerOn(){
+  try{ctx=ctx||new (window.AudioContext||window.webkitAudioContext)();await ctx.resume();}
+  catch(e){log('Audio could not start in this browser: '+e.message);return;}
+  inGain=ctx.createGain();inGain.gain.value=.5;
+  anIn=ctx.createAnalyser();anIn.fftSize=2048;anOut=ctx.createAnalyser();anOut.fftSize=2048;
+  proc=makeProc();REC.buf=new Float32Array(Math.round(ctx.sampleRate*3.2));REC.len=0;REC.play=-1;REC.on=false;REC.held=false;outGain=ctx.createGain();outGain.gain.value=+document.getElementById('vol').value;
+  inGain.connect(anIn);anIn.connect(proc);proc.connect(anOut);anOut.connect(outGain).connect(ctx.destination);
+  running=true;svg.classList.add('on');ledPwr.setAttribute('fill','#ff3b30');
+  log('ESP32 Voice Changer');log('I2S RX  mic  SCK=32 WS=33 SD=34  OK');log('I2S TX  amp  BCLK=18 LRC=21 DIN=19 SD=5  OK');log('SPI TFT  SCL=17 SDA=16 CS=15 DC=2 RST=4  OK');log('Buttons  27 26 22 23 (pull-up)  OK');log('Max recording: 3.20 s');
+  await startSrc();show(-1);log('READY. Hold SW1 (blue) to record.');
+  const b=document.getElementById('power');b.textContent='Power off';b.classList.add('on');
+}
+function powerOff(){
+  running=false;stopSrc();REC.on=false;REC.held=false;REC.play=-1;show(-1);
+  try{inGain.disconnect();anIn.disconnect();proc.disconnect();anOut.disconnect();outGain.disconnect();}catch(e){}
+  svg.classList.remove('on');ledPwr.setAttribute('fill','#3a1414');
+  const b=document.getElementById('power');b.textContent='Power on';b.classList.remove('on');log('Power off');
+}
+document.getElementById('power').addEventListener('click',()=>running?powerOff():powerOn());
+
+/* =========================================================
+   Drawing loop: TFT, spectrum, live wires, speaker, mic glow
+   ========================================================= */
+function pitch(buf,sr){let r=0;for(let i=0;i<buf.length;i++)r+=buf[i]*buf[i];if(Math.sqrt(r/buf.length)<.01)return 0;const a=Math.floor(sr/600),z=Math.floor(sr/60);let best=0,bl=0;for(let L=a;L<=z;L++){let s=0;for(let i=0;i<buf.length-L;i+=2)s+=buf[i]*buf[i+L];if(s>best){best=s;bl=L;}}return bl?sr/bl:0;}
+const tftC=document.getElementById('tft'),tft=tftC.getContext('2d'),spec=document.getElementById('spec').getContext('2d');
+const mini=document.getElementById('tftMini');const miniCtx=mini?mini.getContext('2d'):null;
+const tdIn=new Float32Array(2048),tdOut=new Float32Array(2048),fqIn=new Uint8Array(1024),fqOut=new Uint8Array(1024);
+let fIn=0,fOut=0,lastP=0,rmsIn=0,rmsOut=0;
+const rms=a=>{let s=0;for(let i=0;i<a.length;i+=4)s+=a[i]*a[i];return Math.sqrt(s/(a.length/4));};
+
+function rr(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+function drawTFT(){
+  /* mirrors the firmware screen (rev 3) at 160x128 */
+  const BG='#0B1A31',PANEL='#10233F',LINE='#2C4468',UP='#4B6E94',SILK='#F2F0E6',DIM='#A6B4CA',READY='#9FE3B4',RECC='#FF7A6B',WARN='#F08A4B';
+  const FX={1:'#E9C46A',2:'#F08A4B',3:'#7FD3E6'},HINT={1:'Pitch up x1.6',2:'Pitch down x0.65',3:'Ring mod 50 Hz'};
+  tft.textBaseline='top';tft.fillStyle=BG;tft.fillRect(0,0,160,128);
+  if(!running){tft.font='bold 9px monospace';tft.fillStyle='#2a3850';tft.fillText('NO POWER',54,58);return;}
+  const sr=ctx.sampleRate,hz=f=>f?Math.round(f)+'Hz':'--';
+  let col,big,hint,glyph,chip=-1,f0,f1,f1c=DIM,mode;
+  if(toast&&performance.now()<toast.until&&!REC.held&&REC.play<0){col=toast.col;big=toast.big;hint=toast.small;glyph=0;f0='LAST --';f1='MAX 3.2s';mode='empty';}
+  else if(REC.held){col=RECC;big='REC';hint=REC.full?'Memory full. Let go':'Release BLUE = stop';glyph=(performance.now()%800<400)?2:0;chip=0;f0='MIC '+hz(fIn);f1=(REC.len/sr).toFixed(1)+'s';mode='rec';}
+  else if(REC.play>=0){col=FX[REC.fx];big=MODES[REC.fx].name;hint=HINT[REC.fx];glyph=3;chip=REC.fx;f0='IN '+hz(fIn);f1=REC.fx===3?'RING 50Hz':'OUT '+hz(fOut);f1c=col;mode='play';}
+  else{col=READY;big='READY';hint=REC.len?'Press GREY/WHT/BLK':'Hold BLUE to record';glyph=1;f0=REC.len?`LAST ${(REC.len/sr).toFixed(1)}s`:'LAST --';f1='MAX 3.2s';mode=REC.len?'ready':'empty';}
+  tft.font='9px monospace';tft.fillStyle=DIM;tft.fillText('VOICE CHANGER',4,2);
+  tft.fillStyle=col;tft.fillRect(0,12,160,2);
+  tft.font='bold 16px monospace';tft.fillText(big,4,18);
+  const gx=142,gy=19;tft.strokeStyle=col;tft.lineWidth=2;
+  if(glyph===1){tft.beginPath();tft.arc(gx+7,gy+7,5.5,0,7);tft.stroke();tft.beginPath();tft.arc(gx+7,gy+7,2,0,7);tft.fill();}
+  if(glyph===2){tft.beginPath();tft.arc(gx+7,gy+7,6,0,7);tft.fill();}
+  if(glyph===3&&big.length<=7||glyph===3&&big.length*10<130){tft.beginPath();tft.moveTo(gx+2,gy+1);tft.lineTo(gx+2,gy+13);tft.lineTo(gx+13,gy+7);tft.closePath();tft.fill();}
+  tft.font='9px monospace';tft.fillStyle=(REC.held&&REC.full)?WARN:SILK;tft.fillText(hint,4,37);
+  // tape
+  tft.fillStyle=PANEL;rr(tft,4,50,152,37,3);tft.fill();
+  const NB=48,mid=68,half=14,B=REC.buf;
+  const pk=(a,b)=>{let p=0;for(let i=a;i<b;i+=8){const v=Math.abs(B[i]);if(v>p)p=v;}return p;};
+  for(let i=0;i<NB;i++){
+    const x=8+i*3;let hgt=1,c=LINE;
+    if(mode==='rec'){const a=Math.floor(i*B.length/NB),b=Math.floor((i+1)*B.length/NB);if(b<=REC.len){hgt=Math.max(1,Math.sqrt(Math.min(1,pk(a,b)/.25))*half);c=RECC;}}
+    else if(mode!=='empty'){const a=Math.floor(i*REC.len/NB),b=Math.floor((i+1)*REC.len/NB);hgt=Math.max(1,Math.sqrt(Math.min(1,pk(a,b)/.9))*half);c=mode==='play'?(b<=REC.play?col:UP):SILK;}
+    tft.fillStyle=c;tft.fillRect(x,mid-hgt,2,2*hgt);
+  }
+  // fields
+  [[f0,SILK],[f1,f1c]].forEach(([s,c],i)=>{tft.fillStyle=PANEL;rr(tft,4+i*78,92,74,14,2);tft.fill();tft.fillStyle=c;tft.fillText(s,9+i*78,95);});
+  // button chips
+  [['REC','#3B82F6','#fff'],['HI','#8C8F8C','#000'],['LO','#fff','#000'],['BOT','#000','#fff']].forEach(([l,fc,ic],i)=>{
+    const x=4+i*38;tft.fillStyle=fc;rr(tft,x+2,111,32,14,4);tft.fill();
+    if(i===3){tft.strokeStyle=DIM;tft.lineWidth=1;rr(tft,x+2.5,111.5,31,13,4);tft.stroke();}
+    if(i===chip){tft.strokeStyle=col;tft.lineWidth=1;rr(tft,x+.5,109.5,35,17,6);tft.stroke();}
+    tft.fillStyle=ic;tft.font='bold 9px monospace';tft.fillText(l,x+18-l.length*2.7,114);
+  });
+}
+function drawSpec(){
+  const W=600,H=220;spec.fillStyle='#071226';spec.fillRect(0,0,W,H);spec.font='15px "IBM Plex Mono",monospace';
+  const maxHz=2000;[250,500,1000,1500].forEach(hz=>{const x=hz/maxHz*W;spec.strokeStyle='rgba(242,240,230,.08)';spec.beginPath();spec.moveTo(x,0);spec.lineTo(x,H);spec.stroke();spec.fillStyle='rgba(166,180,202,.6)';spec.fillText(hz+' Hz',x+4,H-8);});
+  if(!running){spec.fillStyle='rgba(166,180,202,.5)';spec.fillText('Press Power on',W/2-60,H/2);return;}
+  const bin=ctx.sampleRate/2048,n=Math.floor(maxHz/bin);
+  [[fqIn,'#7FD3E6'],[fqOut,'#F08A4B']].forEach(([a,col])=>{spec.strokeStyle=col;spec.lineWidth=2.5;spec.beginPath();for(let i=0;i<n;i++){const x=i*bin/maxHz*W,y=H-26-(a[i]/255)*(H-36);i?spec.lineTo(x,y):spec.moveTo(x,y);}spec.stroke();});
+}
+function frame(t){
+  if(running&&anIn){
+    anIn.getFloatTimeDomainData(tdIn);anOut.getFloatTimeDomainData(tdOut);anIn.getByteFrequencyData(fqIn);anOut.getByteFrequencyData(fqOut);
+    rmsIn=rmsIn*.7+rms(tdIn)*.3;rmsOut=rmsOut*.7+rms(tdOut)*.3;
+  }else{rmsIn*=.85;rmsOut*=.85;}
+  // live wires: data pulses only where data is really moving
+  if(running&&anIn&&t-lastP>200){lastP=t;const sr=ctx.sampleRate;if(REC.play>=0){fIn=pitch(REC.buf.subarray(REC.play,Math.min(REC.len,REC.play+2048)),sr);fOut=pitch(tdOut,sr);}else{fIn=pitch(tdIn,sr);fOut=0;}}
+  if(REC.full&&!REC.fullLogged){REC.fullLogged=true;log('  FULL: memory full, let go of SW1.');}
+  if(REC.done){REC.done=false;log('PLAY done → READY');show(-1);}
+  const act={mic:running&&REC.on&&rmsIn>.004,amp:running&&REC.play>=0&&rmsOut>.004,tft:running,v3:running,v5:running,gnd:false,btn:false};
+  WIRES.forEach(w=>w.g.classList.toggle('live',!!act[w.bus]));
+  micGlow.setAttribute('opacity',Math.min(1,rmsIn*14).toFixed(2));
+  const s=1+Math.min(.14,rmsOut*1.6);cone.setAttribute('transform',`translate(${SPX},${SPY}) scale(${s.toFixed(3)}) translate(${-SPX},${-SPY})`);
+  ledIO.setAttribute('fill',t-ioBlink<180?'#3b82f6':'#10213a');
+  drawTFT();if(miniCtx)miniCtx.drawImage(tftC,0,0);drawSpec();
+  requestAnimationFrame(frame);
+}
+show(-1);requestAnimationFrame(frame);
+
+</script>
+</body>
+</html>
